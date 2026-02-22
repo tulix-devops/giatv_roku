@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<component name="video_player" extends="Group">
+    <interface>
+        <field id="contentURL" type="string" onChange="onContentURLChanged" />
+    </interface>
+    <children>
+        <!-- <Video
+            id="videoPlayer"
+            translation="[0, 0]"
+            width="1730"
+            height="500"
+            content="https://bozztv.com/dvrfl05/gin-armeniaeu1/tracks-v1a1/mono.m3u8" /> -->
+        <Video
+            id="videoPlayer"
+            translation="[0, 0]"
+            width="1730"
+            height="1080"
+            />
+        <!-- <Poster
+            id="pauseButton"
+            uri="pkg:/images/png/full_screen_icon.png"
+            translation="[1600, 510]"
+            width="50"
+            height="50" /> -->
+        <Poster
+            id="fullscreenButton"
+            uri="pkg:/images/png/full_screen_icon.png"
+            translation="[1650, 950]"
+            width="50"
+            height="50" />
+    </children>
+    <script type="text/brightscript" uri="pkg:/components/video_player.brs" />
+</component>

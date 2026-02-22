@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- EPG Program Item for TimeGrid (dynamic sizing based on duration) -->
+<component name="EPGProgramItem" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentSet" />
+        <field id="width" type="float" onChange="onLayoutChanged" />
+        <field id="height" type="float" onChange="onLayoutChanged" />
+        <field id="focusPercent" type="float" onChange="onFocusPercentChanged" />
+    </interface>
+    
+    <script type="text/brightscript" uri="pkg:/components/widgets/EPGProgramItem.brs" />
+    
+    <children>
+        <!-- Program Card: Background default=#1F3B5C, focused=#3498DB -->
+        <Rectangle id="itemBackground" 
+                   width="100" 
+                   height="180" 
+                   color="#1F3B5C" />
+        
+        <!-- Title: smaller font, #FFFFFF -->
+        <Label id="programTitle" 
+               translation="[12, 18]"
+               width="76"
+               height="24"
+               font="font:SmallSystemFont"
+               color="#FFFFFF"
+               horizAlign="left"
+               vertAlign="center"
+               maxLines="1" />
+        
+        <!-- Time range: smaller font, #B0B8C4 -->
+        <Label id="timeRange" 
+               translation="[12, 46]"
+               width="76"
+               height="18"
+               font="font:VerySmallSystemFont"
+               color="#B0B8C4"
+               horizAlign="left"
+               vertAlign="center"
+               maxLines="1" />
+    </children>
+</component>

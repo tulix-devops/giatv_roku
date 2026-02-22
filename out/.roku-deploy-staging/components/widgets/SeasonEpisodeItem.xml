@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SeasonEpisodeItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet" />
+        <field id="focusPercent" type="float" onChange="showFocus" />
+    </interface>
+    
+    <script type="text/brightscript" uri="pkg:/components/widgets/SeasonEpisodeItem.brs" />
+    
+    <children>
+        <Group id="itemContainer">
+            <!-- Episode Poster -->
+            <Poster
+                id="episodePoster"
+                uri=""
+                width="400"
+                height="225"
+                loadWidth="400"
+                loadHeight="225"
+                loadDisplayMode="scaleToZoom"
+                translation="[0, 0]"/>
+            
+            <!-- Focus Border (shown when focused) -->
+            <Rectangle
+                id="focusBorder"
+                width="400"
+                height="225"
+                color="0x00000000"
+                translation="[0, 0]"
+                visible="false">
+            </Rectangle>
+            
+            <!-- Play Icon Overlay -->
+            <Poster
+                id="playIcon"
+                uri="pkg:/images/png/episode_play.png"
+                width="60"
+                height="60"
+                loadWidth="60"
+                loadHeight="60"
+                translation="[170, 82]"
+                opacity="0.0"/>
+            
+            <!-- Episode Title -->
+            <Label 
+                id="episodeTitle"
+                text=""
+                width="400"
+                height="50"
+                font="font:SmallBoldSystemFont"
+                horizAlign="left"
+                vertAlign="top"
+                color="0xFFFFFFFF"
+                translation="[0, 235]"
+                maxLines="2"
+                wrap="true"/>
+        </Group>
+    </children>
+</component>

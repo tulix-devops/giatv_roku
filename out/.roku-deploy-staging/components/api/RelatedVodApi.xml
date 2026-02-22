@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="RelatedVod" extends="Task" >
+	<interface>
+		<field id="responseData" type="string"/>
+        <field id="relatedID" type="string" />
+		<field id="typeID" type="string" />
+	</interface>
+	<script type="text/brightscript" uri="pkg:/components/api/RelatedVodApi.brs"/>
+</component>

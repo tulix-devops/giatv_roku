@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<component name="HomePlayer" extends="Group">
+    <interface>
+        <field id="contentURL" type="string" onChange="onContentURLChanged" />
+        <field id="width" type="string" onChange="onVideoPlayerWidthChanged" />
+        <field id="height" type="string" onChange="onVideoPlayerHeightChanged" />
+    </interface>
+    <children>
+        <Group translation="[0, 0]">
+            <Video
+            id="videoPlayer"
+            translation="[0, 0]"
+            
+        ></Video>
+        <!-- trickPlayBackgroundOverlay="pkg:/components/images/png/shapes/definetely_not_box_shadow.png" -->
+        <!-- <Poster uri="pkg:/images/png/shapes/definetely_not_box_shadow.png" translation="[0, 350]" width="1400" height="450" loadDisplayMode="scaleToZoom"/>
+        <Poster uri="pkg:/images/png/shapes/left_side_box_shadow.png" translation="[-20, 0]" width="500" height="640" />
+        <Poster uri="pkg:/images/png/shapes/box_shadow_top.png" translation="[0, 0]" width="1400" height="250" loadDisplayMode="scaleToZoom"/> -->
+        
+        </Group>
+        
+    </children>
+    <script type="text/brightscript" uri="pkg:/components/screens/home_screen/HomePlayer.brs" />
+</component>

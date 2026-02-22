@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<component name="Description" extends="LayoutGroup" >
+
+  <interface>
+
+    <!-- Alias to "title" label -->
+
+    <field id="title" type="node" />
+
+    <!-- Alias to "releaseDate" label -->
+
+    <field id="releaseDate" type="node" />
+
+    <!-- Alias to "description" label -->
+
+    <field id="description" type="node" />
+
+    <!-- Content node -->
+
+    <field id="content" type="node" onChange="onContentChanged"/>
+
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/screens/video_dvr_screen/Description/Description.brs" />
+
+  <children>
+
+      <Group
+        id="titleGroup"
+        visible="false" >
+
+        <Label
+          id="titleShadow"
+          color="0x000000"
+          translation="[2, 2]" />
+
+        <Label
+          id="title"
+          color="0xFFFFFF" />
+
+      </Group>
+
+      <Label
+        id="releaseDate"
+        visible="false"
+        opacity=".6"
+        color="0xFFFFFF" />
+
+      <Label
+        id="description"
+        visible="false"
+        color="0xFFFFFF"
+        wrap="true"
+        width="1120"
+        height="145"
+        lineSpacing="7" />
+
+  </children>
+
+</component>

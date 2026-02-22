@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="VideoDVRScreen" extends="Group" initialFocus="Buttons">
+  <interface>
+    <!-- Button press handler -->
+    <field id="itemSelected" type="integer" alwaysnotify="true" alias="Buttons.itemSelected" onChange="onItemSelected" />
+    <!-- Playback flag -->
+    <field id="videoPlayerVisible" type="bool" alwaysnotify="true" alias="VideoPlayer.visible"  onChange="onVideoVisibleChange" />
+    <!-- Content fields -->
+    <field id="content"  type="node" alwaysnotify="true" onChange="onContentChange" />
+    <field id="seekPosition" type="float"/>
+    <field id="dialogErrStream"	type="node"/>
+    <field id="navigatedFrom" type="string" />
+    <!-- Home scene management fields -->
+    <field id="managedByHomeScene" type="bool" value="false" />
+    <field id="backButtonPressed" type="bool" value="false" alwaysnotify="true" />
+    <field id="sourceScreenIndex" type="integer" value="-1" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/screens/video_dvr_screen/VideoDVRScreen.brs" />
+  <script type="text/brightscript" uri="pkg:/components/Config/utils.brs"/>
+  <children>
+    <!-- No idea why a -157 horizontal translation must be used -->
+    <PanelSet
+      id="backgroundPanelSet"
+      translation="[-157, 0]">
+      <!-- Background animation  -->
+      <AnimatedBackground
+          id="backgroundPanel" />
+    </PanelSet>
+    <!-- Animation to fade in/out the entire background -->
+    <Animation
+      id="fadeInBackgroundGroup"
+      repeat="false"
+      duration="0.3">
+      <FloatFieldInterpolator
+        key="[0.0, 1.0]"
+        keyValue="[0.0, 1.0]"
+        fieldToInterp="backgroundGroup.opacity"/>
+    </Animation>
+    <Animation
+      id="fadeOutBackgroundGroup"
+      repeat="false"
+      duration="0.3">
+      <FloatFieldInterpolator
+        key="[0.0, 1.0]"
+        keyValue="[1.0, 0.0]"
+        fieldToInterp="backgroundGroup.opacity"/>
+    </Animation>
+    <!-- Control buttons (Button List) -->
+    <LabelList
+      id="Buttons"
+      translation="[1360,370]"
+      color="0xFFFFFF"
+      focusedColor="0xFFFFFF"
+      focusBitmapUri="pkg:/images/basic.9.png"
+      textHorizAlign="left"
+      opacity="0.8"
+      numRows="2"
+      vertFocusAnimationStyle="floatingFocus"
+      itemSpacing="[0,20]"
+      itemSize="[440, 100]" />
+    <!-- Black H.U.D. at bottom of the Details Screen -->
+    <Rectangle
+      id="HUDRectangle"
+      color="0x000000"
+      opacity="0.5"
+      width="1920"
+      height="300"
+      translation="[0, 780]" />
+    <!-- Item poster (small copy of background image representing the selected content) -->
+    <Poster
+      id="Poster"
+      translation="[120, 815]"
+      width="300"
+      height="178" />
+    <!-- Item description -->
+    <Description
+      id="Description"
+      translation="[500, 810]" />
+    <!-- Solid color background for Overhang (setting color on the Overhang itself
+         results in the color being extended below the bottom shaded area). -->
+    <Rectangle
+      id="overhangBackground"
+      width="1920"
+      opacity="0.8"
+      translation="[0,0]" />
+    <!-- Overhang Node (has to be rendered after others) -->
+    <Overhang
+      id="detailsOverhang"
+	  logoUri="pkg:/images/png/joygo-big.png" 
+	   height="170"
+	    color="0x333333"
+	     logoBaselineOffset="40"
+      optionsAvailable="false"
+      showClock="false" />
+    <!-- Playback node -->
+    <Video
+      id="VideoPlayer"
+      visible="false"
+      translation="[0, 0]"
+      width="1920"
+      height="1080">
+       </Video>
+  </children>
+</component>

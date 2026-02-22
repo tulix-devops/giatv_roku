@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ValidateSubscriptionApi" extends="Task" >
+	<interface>
+		<field id="responseData" type="string"/>
+        <field id="transactionId" type="string" />
+        <field id="authToken" type="string" />
+	</interface>
+	<script type="text/brightscript" uri="pkg:/components/api/ValidateSubscriptionApi.brs"/>
+</component>

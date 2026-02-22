@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="EPGDayItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChanged" />
+        <field id="focusPercent" type="float" onChange="onFocusPercentChanged" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/widgets/EPGDayItem.brs" />
+
+    <children>
+        <Rectangle id="bg"
+                   width="312"
+                   height="50"
+                   color="#1F3B5C" />
+
+        <Label id="label"
+               translation="[0, 0]"
+               width="312"
+               height="50"
+               font="font:SmallBoldSystemFont"
+               color="#FFFFFF"
+               horizAlign="center"
+               vertAlign="center"
+               maxLines="1" />
+
+        <!-- bottom divider -->
+        <Rectangle id="divider"
+                   translation="[0, 49]"
+                   width="312"
+                   height="1"
+                   color="#2E5A8A"
+                   opacity="0.6" />
+    </children>
+</component>
+

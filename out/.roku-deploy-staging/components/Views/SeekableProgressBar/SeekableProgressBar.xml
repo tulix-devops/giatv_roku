@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SeekableProgressBar" extends="Group">
+    <interface>
+        <field id="barWidth" type="integer" alwaysnotify="true" value="300" alias="progressWell.width"/>
+        <field id="barHeight" type="integer" alwaysnotify="true" value="20" alias="progressWell.height"/>
+        <!-- <field id="barWidth" type="integer" alwaysnotify="true" value="300" onChange="setProgressWellWidth"/>
+        <field id="barHeight" type="integer" alwaysnotify="true" value="20" onChange="setProgressWellHeight"/> -->
+        <field id="duration" type="integer" alwaysnotify="true" />
+        <field id="position" type="integer" alwaysnotify="true" />
+        <field id="seekPosition" type="integer" alwaysnotify="true" />
+
+        <field id="emptyBarBlendColor" alias="progressWell.blendColor"/>
+        <field id="filledBarBlendColor" alias="progress.blendColor"/>
+        <field id="seekBarBlendColor" alias="seekProgress.blendColor"/>
+    </interface>
+
+    <script type="text/brightscript" uri="SeekableProgressBar.brs" />
+
+    <children>
+        <Group id="playBar">
+            <Poster
+                id="progressWell"
+                width="300"
+                height="20"
+                blendColor="0xc0c0c015"
+                uri="pkg:/images/Progress bar.9.png" />
+            <Poster
+                id="progress"
+                width="2"
+                height="20"
+                blendColor="0xc0c0c0ff"
+                uri="pkg:/images/Progress bar.9.png" />
+            <Poster
+                id="seekProgress"
+                width="2"
+                height="20"
+                blendColor="0x90909099"
+                uri="pkg:/images/Progress bar.9.png" />
+        </Group>
+    </children>
+</component>

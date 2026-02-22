@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="vod_screen" extends="Group">
+  <script type="text/brightscript" uri="pkg:/components/screens/vod_screen/vod_screen.brs" />
+  <script type="text/brightscript" uri="pkg:/source/StaticContent.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/VodEntityHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/CategoryEntityHelper.brs" />
+  <interface>
+    <field id="vodDataEntity" type="array" onChange="updateVodScreen"/>
+    <field id="categoryDataEntity" type="array" onChange="updateVodCategoryScreen"/>
+    <field id="lastFocusedChild" type="integer" />
+    <!-- onChange="updateHomeScreen" -->
+  </interface>
+  <children>
+    <!-- <default_poster id="default_poster" translation="[0, 0]" visible="true" /> -->
+    <Group id="itemDetailsGroup" opacity="0.0">
+      <HomePlayer id="vodPlayer"  visible="true" translation="[400, 0]">
+    
+
+      </HomePlayer>
+      <ItemDetails id="vodItemDetails" translation="[20, 0]" visible="true">
+        </ItemDetails>
+    </Group>
+    <!-- <Group id="vodContainer" translation="[20, 20]">
+      <RowList 
+            id = "vodRowList" 
+            translation = "[ 20, 0 ]" 
+            itemComponentName = "RowListItemComponent" 
+            itemSize = "[ 1920, 420 ]" 
+            rowItemSize = "[ [250, 350] ]"  
+            itemSpacing = "[ 0, 0 ]" 
+            rowItemSpacing = "[ [15,20] ]"
+            rowLabelOffset="[[0, 15]]"
+            showRowLabel = "[ true ]"
+            drawFocusFeedback = "true"
+            rowHasFocus = "false"
+            numRows="2"
+            rowFocusAnimationStyle="fixedFocus"
+            focusBitmapUri="pkg:/images/png/shapes/focusable_white.9.png"
+            />
+    </Group> -->
+    <Group id="vodContainer" translation="[20, 20]">
+      <Poster
+      uri="pkg:/images/png/gradient.jpeg"
+      width="1920"
+      height="1080"
+      loadDisplayMode="scaleToFill"
+      translation="[-20, -20]"/>
+      <RowList 
+      id = "categoryRowList" 
+      translation = "[ 20, 0 ]" 
+      itemComponentName = "RowListCategoryComponent" 
+      itemSize = "[ 1920, 300 ]" 
+      rowItemSize = "[ [250, 100] ]" 
+      itemSpacing = "[ 0, 0 ]" 
+      rowItemSpacing = "[ [15,20] ]"
+      rowLabelOffset="[[0, 15]]"
+      showRowLabel = "[ true ]"
+      drawFocusFeedback = "true"
+      rowHasFocus = "false"
+      numRows="2"
+      rowFocusAnimationStyle="fixedFocus"
+      focusBitmapBlendColor="0x4A90E2FF"
+      />
+
+
+
+      <MarkupGrid
+          id="vodRowList"
+          translation="[20, 180]"
+          itemComponentName="RowListItemComponent"
+          itemSize="[300, 420]"
+          numColumns="5"
+          numRows="5"
+          columnSpacing="15"
+          rowSpacing="20"
+          itemSpacing="[25,25]" 
+          rowLabelOffset="[0, 15]"
+          drawFocusFeedback="true"
+          drawFocusFeedbackOnTop="true"
+          vertFocusAnimationStyle = "fixedFocus"
+          focusBitmapBlendColor="0x4A90E2FF"
+      />
+    </Group>
+    <Animation
+    id="activateRow"
+    duration="0.3"
+    repeat="false"
+    easeFunction="linear"
+>
+      <Vector2DFieldInterpolator
+        id="translationInterpolator"
+        key="[0.0, 1.0]"
+        keyValue="[ [20, 20], [20, 480] ]"
+        fieldToInterp="vodContainer.translation"
+    />
+    </Animation>
+    <Animation
+id="deactivateRow"
+duration="0.5"
+repeat="false"
+easeFunction="OutQuad"
+>
+      <Vector2DFieldInterpolator
+id="translationInterpolator"
+key="[0.0, 1.0]"
+keyValue="[ [20, 480], [20, 20]  ]"
+fieldToInterp="vodContainer.translation"
+/>
+    </Animation>
+    <Animation
+id="activateItemDetails"
+duration="1"
+repeat="false"
+easeFunction="OutQuad"
+>
+      <FloatFieldInterpolator    id = "opacityInterpolator"   key="[0.0,  1.0]"    keyValue="[0.0, 1.0 ]"       fieldToInterp="itemDetailsGroup.opacity"   />
+      <!-- <Vector2DFieldInterpolator
+id="opacityInterpolator"
+key="[0.0, 1.0]"
+keyValue="[0.0, 1.0]"
+fieldToInterp="itemDetailsGroup.opacity"
+/> -->
+    </Animation>
+    <Animation
+id="deactivateItemDetails"
+duration="1"
+repeat="false"
+easeFunction="OutQuad"
+>
+      <FloatFieldInterpolator    id = "opacityInterpolator"   key="[0.0,  1.0]"    keyValue="[ 1.0, 0.0 ]"       fieldToInterp="itemDetailsGroup.opacity"   />
+    </Animation>
+  </children>
+</component>

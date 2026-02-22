@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="TVGuideScreenMock" extends="Group">
+    <script type="text/brightscript" uri="pkg:/components/screens/TVGuideScreenMock.brs" />
+    
+    <interface>
+        <field id="contentTypeId" type="int" value="17" />
+    </interface>
+    
+    <children>
+        <!-- Background -->
+        <Rectangle id="background" width="1920" height="1080" color="#0D1B2A" />
+        
+        <!-- Header -->
+        <Group id="headerGroup" translation="[0, 0]">
+            <Rectangle id="headerBg" width="1920" height="140" color="#0F2138" />
+            
+            <Label id="headerTitle" 
+                   text="TV Guide"
+                   translation="[40, 35]"
+                   width="400"
+                   height="70"
+                   font="font:LargeBoldSystemFont"
+                   color="#FFFFFF" />
+            
+            <Rectangle id="headerDivider" 
+                       translation="[0, 138]"
+                       width="1920"
+                       height="2"
+                       color="#3A4A6A" />
+        </Group>
+        
+        <!-- Day Selector (5 days) -->
+        <Group id="daySelectorGroup" translation="[40, 160]">
+            <!-- Will be populated with day buttons dynamically -->
+        </Group>
+        
+        <!-- TOP LEFT: Current Channel Logo -->
+        <Group id="channelLogoGroup" translation="[40, 240]">
+            <Rectangle id="channelLogoBg" 
+                       width="320" 
+                       height="180" 
+                       color="#1F3B5C"
+                       opacity="0.5" />
+            <Poster id="channelLogoImage"
+                    uri=""
+                    translation="[0, 0]"
+                    width="320"
+                    height="180"
+                    loadDisplayMode="scaleToFit"
+                    loadingBitmapUri=""
+                    failedBitmapUri="" />
+            <Label id="channelLogoName"
+                   text="Channel Name"
+                   translation="[0, 0]"
+                   width="320"
+                   height="180"
+                   font="font:MediumBoldSystemFont"
+                   color="#FFFFFF"
+                   horizAlign="center"
+                   vertAlign="center"
+                   visible="true" />
+        </Group>
+        
+        <!-- PROGRAM DETAILS: Above TimeGrid -->
+        <Group id="programDetailsGroup" translation="[40, 440]">
+            <Rectangle id="detailsBg" 
+                       width="480" 
+                       height="200" 
+                       color="#1F3B5C"
+                       opacity="0.5" />
+            <Label id="programTitle" 
+                   text="Program Title"
+                   translation="[30, 20]"
+                   width="420"
+                   height="60"
+                   font="font:LargeBoldSystemFont"
+                   color="#FFFFFF"
+                   horizAlign="left"
+                   vertAlign="top"
+                   wrap="true"
+                   maxLines="2" />
+            <Label id="programTime" 
+                   text="10:00 AM - 11:00 AM"
+                   translation="[30, 90]"
+                   width="420"
+                   height="30"
+                   font="font:MediumSystemFont"
+                   color="#B0B8C4"
+                   horizAlign="left"
+                   vertAlign="center" />
+            <Label id="programDescription" 
+                   text="Program description goes here..."
+                   translation="[30, 130]"
+                   width="420"
+                   height="60"
+                   font="font:SmallSystemFont"
+                   color="#B0B8C4"
+                   horizAlign="left"
+                   vertAlign="top"
+                   wrap="true"
+                   maxLines="3" />
+        </Group>
+        
+        <!-- VIDEO PLAYER: Large preview player (top right) -->
+        <Group id="videoPlayerGroup" translation="[540, 240]">
+            <Rectangle id="videoPlayerBg" 
+                       width="1340" 
+                       height="400" 
+                       color="#000000" />
+            <Label id="videoPlayerStatus"
+                   text="[MOCK] Video Preview Area"
+                   translation="[0, 0]"
+                   width="1340"
+                   height="400"
+                   font="font:LargeBoldSystemFont"
+                   color="#B0B8C4"
+                   horizAlign="center"
+                   vertAlign="center"
+                   visible="true" />
+        </Group>
+        
+        <!-- TimeGrid -->
+        <TimeGrid id="timeGrid"
+                  translation="[0, 680]"
+                  width="1920"
+                  height="400"
+                  visible="true"
+                  focusable="true"
+                  
+                  channelInfoComponentName="EPGChannelItem"
+                  
+                  numRows="5"
+                  fillProgramGaps="true"
+                  showPastTimeScreen="true"
+                  
+                  duration="9000"
+                  maxDays="1"
+                  
+                  channelInfoWidth="360"
+                  programInfoBackgroundColor="#1F3B5C"
+                  programInfoFocusedBackgroundColor="#3498DB"
+                  
+                  timeBarHeight="60"
+                  timeBarTextColor="#B0B8C4"
+                  timeBarBackgroundColor="#0F2138"
+                  
+                  gridBackgroundColor="#0D1B2A"
+                  channelInfoBackgroundColor="#1F3B5C"
+                  
+                  channelNoDataText=""
+                  loadingDataText=""
+                  
+                  nowBarBlendColor="#E74C3C"
+                  nowBarWidth="4"
+                  nowBarOffset="0"
+                  minimumNowBarOffset="300" />
+        
+        <!-- Loading indicator -->
+        <Group id="loadingGroup" translation="[860, 540]" visible="false">
+            <Label id="loadingLabel" 
+                   text="Loading..."
+                   font="font:LargeBoldSystemFont"
+                   color="#FFFFFF"
+                   horizAlign="center"
+                   translation="[-50, 0]"
+                   width="100" />
+        </Group>
+    </children>
+</component>

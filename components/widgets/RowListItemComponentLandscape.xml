@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="RowListItemComponentLandscape" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet" />
+    </interface>
+    <script type="text/brightscript" uri="RowListItemComponentLandscape.brs" />
+    <children>
+        <Group>
+            <!-- Main Poster with Rounded Corners Effect -->
+            <Poster
+              id="poster"
+              width="480"
+              height="270"
+              loadDisplayMode="scaleToZoom"
+            />
+            
+            <!-- Floating Info Panel - Simplified for Live Channels -->
+            <Group id="infoPanel" translation="[0, 210]">
+                <!-- Main Background with Glass Effect - Hidden for Live Channels -->
+                <Rectangle
+                    id="glassBackground"
+                    width="483"
+                    height="60" 
+                    color="0x0A0A0A" 
+                    opacity="0.92"
+                    translation="[0, 0]"
+                    visible="false"
+                />
+                
+                <!-- Glass Reflection Effect - Hidden for Live Channels -->
+                <Rectangle
+                    id="glassReflection"
+                    width="485"
+                    height="20"
+                    color="0xFFFFFF"
+                    opacity="0.1"
+                    translation="[0, 0]"
+                    visible="false"
+                />
+                
+                <!-- Title with Glow Effect -->
+                <Label
+                    id="titleLabel"
+                    color="0xFFFFFF"
+                    text=""
+                    horizAlign="left"
+                    vertAlign="top"
+                    font="font:UrbanistBold"
+                    numLines="1"
+                    translation="[10, 10]"
+                    width="460"
+                >
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24" />
+                </Label>
+            </Group>
+            
+            <!-- Floating Action Button - Centered on Image -->
+            <Group id="actionButton" translation="[198, 93]" opacity="0.0">
+                <Poster
+                    id="playIcon"
+                    uri="pkg:/images/png/episode_play.png"
+                    width="84"
+                    height="84"
+                    loadDisplayMode="scaleToFit"
+                    translation="[0, 0]"
+                />
+            </Group>
+            
+            <!-- Corner Badge for Content Type -->
+            <Group id="cornerBadge" translation="[10, 10]">
+                <Rectangle
+                    id="badgeBackground"
+                    width="100"
+                    height="45"
+                    color="0x4A90E2"
+                    opacity="0.9"
+                />
+                <Label
+                    id="badgeText"
+                    text="SERIES"
+                    color="0xFFFFFF"
+                    font="font:UrbanistBold"
+                    horizAlign="center"
+                    vertAlign="center"
+                    width="100"
+                    height="45"
+                    translation="[0, 0]"
+                >
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20" />
+                </Label>
+            </Group>
+        </Group>
+        
+        <!-- Animations -->
+        <Animation
+            id="focusInAnimation"
+            duration="0.3"
+            repeat="false"
+            easeFunction="outCubic"
+        >
+            <FloatFieldInterpolator
+                key="[0.0, 1.0]"
+                keyValue="[0.0, 1.0]"
+                fieldToInterp="actionButton.opacity"
+            />
+        </Animation>
+        
+        <Animation
+            id="focusOutAnimation"
+            duration="0.2"
+            repeat="false"
+            easeFunction="inCubic"
+        >
+            <FloatFieldInterpolator
+                key="[0.0, 1.0]"
+                keyValue="[1.0, 0.0]"
+                fieldToInterp="actionButton.opacity"
+            />
+        </Animation>
+    </children>
+</component>

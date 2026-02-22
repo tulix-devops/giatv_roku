@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SeriesApi" extends="Task">
+    <interface>
+        <field id="seriesId" type="integer" />
+        <field id="typeId" type="integer" />
+        <field id="seriesData" type="assocarray" />
+        <field id="errorMessage" type="string" />
+    </interface>
+    
+    <script type="text/brightscript" uri="SeriesApi.brs" />
+</component>

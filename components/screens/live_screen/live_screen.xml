@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="live_screen" extends="Group">
+  <script type="text/brightscript" uri="pkg:/components/screens/live_screen/live_screen.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/ChannelEntityHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/CategoryEntityHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/VodEntityHelper.brs" />
+  <interface>
+    <field id="vodDataEntity" type="array" onChange="updateVodScreen"/>
+    <field id="categoryDataEntity" type="array" onChange="updateVodCategoryScreen"/>
+  </interface>
+  <children>
+    <Group id="vodContainer" translation="[20, 20]">
+      <!-- Background with gradient -->
+      <Poster
+        uri="pkg:/images/png/gradient.jpeg"
+        width="1920"
+        height="1080"
+        loadDisplayMode="scaleToFill"
+        translation="[-20, -20]"/>
+      
+      <!-- Categories Label - Increased Size -->
+      <Label
+        text="JoyGo • Categories"
+        color="0xFFFFFFFF"
+        font="font:UrbanistBold"
+        translation="[20, 10]"
+        horizAlign="left"
+        vertAlign="top"
+      >
+        <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="36" />
+      </Label>
+        
+      <!-- Category Row List -->
+      <RowList 
+        id = "categoryRowList" 
+        translation = "[ 20, 80 ]" 
+        itemComponentName = "RowListCategoryComponent" 
+        itemSize = "[ 1920, 300 ]" 
+        rowItemSize = "[ [250, 100] ]"  
+        itemSpacing = "[ 0, 0 ]" 
+        rowItemSpacing = "[ [15,20] ]"
+        rowLabelOffset="[[0, 15]]"
+        showRowLabel = "[ false ]"
+        drawFocusFeedback = "true"
+        rowHasFocus = "false"
+        numRows="2"
+        rowFocusAnimationStyle="fixedFocus"
+        focusBitmapBlendColor="0x4A90E2FF"
+      />
+
+      <!-- Live Channels Grid - Reduced Space -->
+      <MarkupGrid
+          id="vodRowList"
+          translation="[20, 220]"
+          itemComponentName="RowListItemComponent"
+          itemSize="[320, 180]"
+          numColumns="5"
+          numRows="5"
+          columnSpacing="15"
+          rowSpacing="20"
+          itemSpacing="[25,25]" 
+          rowLabelOffset="[0, 15]"
+          drawFocusFeedback="true"
+          drawFocusFeedbackOnTop="true"
+          vertFocusAnimationStyle = "fixedFocus"
+          focusBitmapBlendColor="0x4A90E2FF"
+      />
+    </Group>
+  </children>
+</component>

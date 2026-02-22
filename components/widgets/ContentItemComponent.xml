@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="ContentItemComponent" extends="Group">
+  <script type="text/brightscript" uri="pkg:/components/widgets/ContentItemComponent.brs" />
+  <interface>
+    <field id="itemContent" type="node" onChange="updateContent"/>
+  </interface>
+  <children>
+    <!-- Content card background -->
+    <Rectangle
+      id="cardBackground"
+      width="200"
+      height="300"
+      color="#1a1a1a"
+      cornerRadius="8" />
+    
+    <!-- Content poster image -->
+    <Poster
+      id="contentPoster"
+      width="200"
+      height="300"
+      loadDisplayMode="scaleToFit"
+      failedBitmapUri="pkg:/images/png/poster_not_found_220x375.png"
+      translation="[0, 0]" />
+    
+    <!-- Content title overlay -->
+    <Rectangle
+      id="titleBackground"
+      width="200"
+      height="50"
+      color="#000000AA"
+      translation="[0, 250]" />
+    
+    <Label
+      id="contentTitle"
+      text=""
+      color="#ffffff"
+      font="font:UrbanistMedium"
+      translation="[10, 260]"
+      width="180"
+      height="40"
+      horizAlign="left"
+      vertAlign="center"
+      wrap="true">
+      <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="16" />
+    </Label>
+    
+    <!-- Focus indicator -->
+    <Rectangle
+      id="focusIndicator"
+      width="200"
+      height="300"
+      color="#f16667"
+      cornerRadius="8"
+      opacity="0"
+      translation="[0, 0]" />
+  </children>
+</component>

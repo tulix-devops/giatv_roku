@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="DynamicContentApi" extends="Task">
+  <script type="text/brightscript" uri="pkg:/components/api/DynamicContentApi.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/ContentItemHelper.brs" />
+  <interface>
+    <field id="contentTypeId" type="int" value="-1" />
+    <field id="responseData" type="string" />
+    <field id="errorMessage" type="string" />
+    <field id="contentItems" type="array" />
+  </interface>
+</component>

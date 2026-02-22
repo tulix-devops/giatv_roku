@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="RowListCategoryComponent" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet" />
+    </interface>
+    <script type="text/brightscript" uri="RowListCategoryComponent.brs" />
+    <children>
+        <Group>
+            <Rectangle
+                id="placeholderRectangle"
+                width="250"
+                height="100"
+                color="#9E9E9E26"
+            >
+                <Label
+                    id="categoryTitle"
+                    text=""
+                    font="font:UrbanistSemiBold"
+                    horizAlign="center"
+                    vertAlign="center"
+                    width="250"
+                    height="100"
+                    translation="[0, 0]"
+                    color="0xFFFFFF"
+                >
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="26" />
+                </Label>
+            </Rectangle>
+        </Group>
+    </children>
+</component>
