@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="M3UChannelItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChanged"/>
+        <field id="focusPercent" type="float" onChange="onFocusPercentChanged"/>
+    </interface>
+
+    <script type="text/brightscript" uri="M3UChannelItem.brs"/>
+
+    <children>
+        <!-- Background card -->
+        <Rectangle
+            id="background"
+            width="320"
+            height="180"
+            color="0x2A2A2AFF"
+            opacity="1.0"/>
+
+        <!-- Channel logo/poster -->
+        <Poster
+            id="channelPoster"
+            width="320"
+            height="180"
+            loadDisplayMode="scaleToFit"
+            failedBitmapUri="pkg:/images/background.png"
+            loadingBitmapUri="pkg:/images/background.png"/>
+
+        <!-- Overlay for text -->
+        <Rectangle
+            id="textOverlay"
+            width="320"
+            height="60"
+            color="0x000000FF"
+            opacity="0.7"
+            translation="[0, 120]"/>
+
+        <!-- Channel name -->
+        <Label
+            id="channelName"
+            width="300"
+            height="30"
+            font="font:MediumBoldSystemFontFile,22"
+            color="0xFFFFFFFF"
+            translation="[10, 125]"
+            horizAlign="left"
+            vertAlign="top"
+            ellipsizeOnBoundary="true"/>
+
+        <!-- Channel number / category -->
+        <Label
+            id="channelInfo"
+            width="300"
+            height="25"
+            font="font:SmallSystemFontFile,18"
+            color="0xCCCCCCFF"
+            translation="[10, 150]"
+            horizAlign="left"
+            vertAlign="top"
+            ellipsizeOnBoundary="true"/>
+
+        <!-- Focus indicator -->
+        <Rectangle
+            id="focusIndicator"
+            width="320"
+            height="180"
+            color="0x00A8E1FF"
+            opacity="0.0"/>
+    </children>
+</component>

@@ -4,6 +4,7 @@
     <interface>
         <field id="accountStatus" type="boolean"/>
         <field id="userData" type="assocarray" onChange="onUserDataChanged"/>
+        <field id="triggerRightAction" type="boolean" onChange="onTriggerRightAction"/>
         <function name="refreshUserData" />
     </interface>
     <children>

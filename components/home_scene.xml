@@ -124,6 +124,11 @@
         <SeasonScreen
     id="SeasonScreen" translation="[0, 0]" visible="false"
     ></SeasonScreen>
+    
+    <M3UChannelScreen
+    id="m3uChannelScreen" translation="[0, 0]" visible="false"
+    ></M3UChannelScreen>
+    
     <SplashPage id="splashPage" translation="[0,0]" visible = "true"/>
     
     <!-- Global Loading Screen - Full Screen Overlay -->

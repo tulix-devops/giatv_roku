@@ -60,7 +60,7 @@ sub handleNavigationResponse()
         if parsedData <> invalid and parsedData.data <> invalid
             print "DynamicNavigationBar.brs - [handleNavigationResponse] Successfully parsed " + parsedData.data.Count().ToStr() + " navigation items"
             
-            ' Check if user is authenticated and inject TV Guide tab
+            ' Inject TV Guide tab (shown for all users)
             print "DynamicNavigationBar.brs - [handleNavigationResponse] *** CALLING injectTVGuideTabIfAuthenticated ***"
             navData = parsedData.data
             navData = injectTVGuideTabIfAuthenticated(navData)
@@ -84,7 +84,7 @@ end sub
 
 function injectTVGuideTabIfAuthenticated(navData as object) as object
     print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] ========================================"
-    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Starting TV Guide injection check"
+    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Starting TV Guide injection"
     print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Input navData count: " + navData.Count().ToStr()
     print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] ========================================"
     
@@ -100,22 +100,11 @@ function injectTVGuideTabIfAuthenticated(navData as object) as object
         end if
     end for
     
-    ' Check if user is authenticated using the correct registry location
-    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Checking authentication..."
-    authData = RetrieveAuthDataForTVGuide()
-    
-    if authData = invalid or authData.accessToken = invalid or authData.accessToken = ""
-        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] User NOT authenticated - no valid auth data"
-        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Returning original navData without TV Guide"
-        return navData
-    end if
-    
-    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Auth data found, token length: " + authData.accessToken.Len().ToStr()
-    
-    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] *** USER IS AUTHENTICATED ***"
+    ' TV Guide is now shown for all users (authenticated and unauthenticated)
+    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] TV Guide will be shown for all users"
     print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Proceeding to inject TV Guide tab"
     
-    ' Find the index of "User Channels" (id: 14) to insert TV Guide after it
+    ' Find the index of "Live TV" (id: 3) to insert TV Guide after it
     insertIndex = -1
     for i = 0 to navData.Count() - 1
         if navData[i] <> invalid and navData[i].id <> invalid
@@ -125,39 +114,19 @@ function injectTVGuideTabIfAuthenticated(navData as object) as object
                 itemId = Val(itemId)
             end if
             print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Checking item " + i.ToStr() + ": id=" + itemId.ToStr() + " (original type: " + originalType + ")"
-            if itemId = 14 ' User Channels
+            if itemId = 3 ' Live TV
                 insertIndex = i + 1
-                print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] *** FOUND User Channels at index " + i.ToStr() + " ***"
+                print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] *** FOUND Live TV at index " + i.ToStr() + " ***"
                 print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Will insert TV Guide at index " + insertIndex.ToStr()
                 exit for
             end if
         end if
     end for
     
-    ' If User Channels not found, insert before Age Restricted (id: 15) or at the end
+    ' If Live TV not found, insert at the beginning (after Home which is typically index 0)
     if insertIndex = -1
-        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] User Channels not found, looking for Age Restricted..."
-        for i = 0 to navData.Count() - 1
-            if navData[i] <> invalid and navData[i].id <> invalid
-                itemId = navData[i].id
-                if Type(itemId) = "roString" or Type(itemId) = "String"
-                    itemId = Val(itemId)
-                end if
-                if itemId = 15 ' Age Restricted
-                    insertIndex = i
-                    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] *** FOUND Age Restricted at index " + i.ToStr() + " ***"
-                    print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Will insert TV Guide before it"
-                    exit for
-                end if
-            end if
-        end for
-    end if
-    
-    ' If still not found, insert at the end (before Profile which is added separately)
-    if insertIndex = -1
-        insertIndex = navData.Count()
-        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Neither User Channels nor Age Restricted found"
-        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Inserting TV Guide at end, index: " + insertIndex.ToStr()
+        print "DynamicNavigationBar.brs - [injectTVGuideTabIfAuthenticated] Live TV not found, inserting TV Guide at index 1 (after Home)"
+        insertIndex = 1
     end if
     
     ' Create TV Guide nav item
@@ -895,6 +864,13 @@ function handleNavigationKey(key as string, press as boolean) as boolean
         end if
         return true
         
+    else if key = "back" then
+        print "DynamicNavigationBar.brs - [handleNavigationKey] BACK: Pressed while navigation has focus"
+        ' Prevent app exit by consuming the back key event when navigation has focus
+        ' User should use up/down to navigate tabs, not back to exit
+        print "DynamicNavigationBar.brs - [handleNavigationKey] BACK: Ignoring to prevent app exit"
+        return true
+        
     else if key = "right" then
         print "DynamicNavigationBar.brs - [handleNavigationKey] RIGHT: Moving focus to content screen"
         
@@ -910,11 +886,16 @@ function handleNavigationKey(key as string, press as boolean) as boolean
                 print "DynamicNavigationBar.brs - [handleNavigationKey] RIGHT key for Profile screen - keeping nav bar visible"
                 ' DON'T set navHasFocus = false - keep nav bar visible for Profile
                 
-                ' Just transfer focus to the Account screen's interactive element
+                ' Transfer focus and trigger button activation
                 accountScreen = parentScene.findNode("account_screen")
                 if accountScreen <> invalid
                     accountScreen.setFocus(true)
                     print "DynamicNavigationBar.brs - [handleNavigationKey] Profile screen focus set, hasFocus: " + accountScreen.hasFocus().ToStr()
+                    
+                    ' Trigger the RIGHT key handler on account screen to activate button immediately
+                    if accountScreen.hasField("triggerRightAction")
+                        accountScreen.triggerRightAction = true
+                    end if
                 end if
                 return true
             else
@@ -1168,10 +1149,8 @@ end sub
 
 function convertNavIndexToScreenIndex(navIndex as integer) as integer
     ' Convert navigation bar index to screen index
-    ' Navigation structure (when authenticated):
-    '   0=Home, 1=Live TV, 2=Movies, 3=Series, 4=User Channels, 5=TV Guide, 6=Age Restricted, 7=Personal, 8=Account
-    ' Navigation structure (when not authenticated):
-    '   0=Home, 1=Live TV, 2=Movies, 3=Series, 4=User Channels, 5=Account
+    ' Navigation structure (TV Guide shown for all users after Live TV):
+    '   0=Home, 1=Live TV, 2=TV Guide, 3=Movies, 4=Series, 5=User Channels, 6=Age Restricted, 7=Personal, 8=Account
     ' Screen structure: Direct 1:1 mapping based on dynamic navigation items
     
     print "DynamicNavigationBar.brs - [convertNavIndexToScreenIndex] Converting nav index " + navIndex.ToStr() + " to screen index " + navIndex.ToStr()

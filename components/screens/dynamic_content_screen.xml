@@ -10,6 +10,8 @@
     <field id="dvrRequested" type="assocarray" />
     <field id="videoPlayRequested" type="assocarray" />
     <field id="isExpanded" type="bool" value="false" onChange="onExpandedChanged"/>
+    <field id="visible" type="bool" value="true" onChange="onVisibleChanged"/>
+    <field id="restoreFocusRequested" type="bool" value="false" onChange="onRestoreFocusRequested"/>
   </interface>
   <children>
     <!-- Content Expand/Collapse Animations -->

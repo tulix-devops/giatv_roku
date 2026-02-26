@@ -91,6 +91,30 @@ sub onAccountFocusChanged()
     end if
 end sub
 
+sub onTriggerRightAction()
+    ' Handle right action trigger from navigation bar
+    print "AccountScreen.brs - [onTriggerRightAction] Triggered from navigation bar"
+    
+    if m.top.accountStatus = true
+        ' User is authenticated - activate logout button
+        if m.logoutGroup <> invalid
+            print "AccountScreen.brs - [onTriggerRightAction] Activating logout button"
+            activateLogoutButton()
+            m.logoutGroup.setFocus(true)
+        end if
+    else
+        ' User is not authenticated - activate login button
+        if m.loginGroup <> invalid
+            print "AccountScreen.brs - [onTriggerRightAction] Activating login button"
+            activateLoginButton()
+            m.loginGroup.setFocus(true)
+        end if
+    end if
+    
+    ' Reset the trigger
+    m.top.triggerRightAction = false
+end sub
+
 sub refreshAccountUI()
     print "AccountScreen.brs - [refreshAccountUI] Refreshing Account screen UI elements"
     
@@ -350,12 +374,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
         print "AccountScreen.brs - [onKeyEvent] RIGHT key pressed - activating action button"
         print "AccountScreen.brs - [onKeyEvent] Account screen hasFocus: " + m.top.hasFocus().ToStr()
         print "AccountScreen.brs - [onKeyEvent] Account status: " + m.top.accountStatus.ToStr()
-        
-        ' Ensure the account screen has focus first
-        if not m.top.hasFocus()
-            print "AccountScreen.brs - [onKeyEvent] Account screen doesn't have focus, setting focus first"
-            m.top.setFocus(true)
-        end if
         
         ' Activate the appropriate button based on authentication status
         if m.top.accountStatus = true

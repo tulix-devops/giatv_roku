@@ -526,16 +526,63 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
     channelContents = []
     for each channel in tvGuideChannels
         if channel <> invalid
-            ' Get current show if available
+            ' Get current show if available (find show airing now based on local time)
             currentShowName = ""
             currentShowDescription = ""
             if channel.shows <> invalid
                 showsInterface = GetInterface(channel.shows, "ifArray")
                 if showsInterface <> invalid and channel.shows.Count() > 0
-                    firstShow = channel.shows[0]
-                    if firstShow <> invalid
-                        if firstShow.name <> invalid then currentShowName = firstShow.name
-                        if firstShow.longdescription <> invalid then currentShowDescription = firstShow.longdescription
+                    ' Get current local time
+                    currentDateTime = CreateObject("roDateTime")
+                    currentDateTime.ToLocalTime()
+                    currentHour = currentDateTime.GetHours()
+                    currentMinute = currentDateTime.GetMinutes()
+                    currentTotalMinutes = currentHour * 60 + currentMinute
+                    
+                    ' Find the show that's currently airing
+                    currentShow = invalid
+                    for each show in channel.shows
+                        if show <> invalid and show.start <> invalid and show.end <> invalid
+                            ' Parse start time (HH:MM format in local time)
+                            startParts = show.start.Split(":")
+                            if startParts.Count() >= 2
+                                showStartHour = Val(startParts[0])
+                                showStartMinute = Val(startParts[1])
+                                showStartTotal = showStartHour * 60 + showStartMinute
+                                
+                                ' Parse end time
+                                endParts = show.end.Split(":")
+                                if endParts.Count() >= 2
+                                    showEndHour = Val(endParts[0])
+                                    showEndMinute = Val(endParts[1])
+                                    showEndTotal = showEndHour * 60 + showEndMinute
+                                    
+                                    ' Handle shows spanning midnight
+                                    if showEndTotal < showStartTotal
+                                        showEndTotal = showEndTotal + 1440 ' Add 24 hours in minutes
+                                    end if
+                                    
+                                    ' Check if current time is within this show's time range
+                                    if currentTotalMinutes >= showStartTotal and currentTotalMinutes < showEndTotal
+                                        currentShow = show
+                                        exit for
+                                    end if
+                                end if
+                            end if
+                        end if
+                    end for
+                    
+                    ' Use current show if found, otherwise use first show as fallback
+                    if currentShow <> invalid
+                        if currentShow.name <> invalid then currentShowName = currentShow.name
+                        if currentShow.longdescription <> invalid then currentShowDescription = currentShow.longdescription
+                    else if channel.shows.Count() > 0
+                        ' Fallback to first show
+                        firstShow = channel.shows[0]
+                        if firstShow <> invalid
+                            if firstShow.name <> invalid then currentShowName = firstShow.name
+                            if firstShow.longdescription <> invalid then currentShowDescription = firstShow.longdescription
+                        end if
                     end if
                 end if
             end if

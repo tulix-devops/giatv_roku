@@ -518,14 +518,20 @@ function handleBackNavigation() as boolean
                 screen = dynamicScreensContainer.getChild(i)
                 if screen <> invalid and screen.contentTypeId <> invalid and screen.contentTypeId = 2
                     screen.visible = true
-                    screen.setFocus(true)
-                    print "SeasonScreen.brs - [handleBackNavigation] Found and activated Series screen"
+                    print "SeasonScreen.brs - [handleBackNavigation] Found and made Series screen visible"
+                    
+                    ' Trigger focus restoration by setting a field on the screen
+                    if screen.hasField("restoreFocusRequested")
+                        screen.restoreFocusRequested = true
+                        print "SeasonScreen.brs - [handleBackNavigation] Triggered focus restoration on Series screen"
+                    else
+                        ' Fallback: set focus directly
+                        screen.setFocus(true)
+                        print "SeasonScreen.brs - [handleBackNavigation] Set focus on Series screen (fallback)"
+                    end if
                     exit for
                 end if
             end for
-        end if
-        if dynamicNavBar <> invalid
-            dynamicNavBar.setFocus(true)
         end if
     else
         ' Default fallback to home

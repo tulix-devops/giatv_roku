@@ -146,9 +146,42 @@ end sub
 
 sub loadTVGuideForSelectedDay()
     print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] ========== STARTING API CALL =========="
-    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] Day offset: " + m.dayOffset.ToStr()
-    
+    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] Day offset (UI): " + m.dayOffset.ToStr()
+
     showLoading()
+
+    ' Calculate which day to request from API
+    ' API uses local date, but we need EST date
+    ' If it's 1 AM local on Feb 25, but 4 PM EST on Feb 24, we need to request Feb 24
+    dateTimeUTC = CreateObject("roDateTime")
+    dateTimeLocal = CreateObject("roDateTime")
+    dateTimeLocal.ToLocalTime()
+    
+    ' Calculate EST date
+    currentMonth = dateTimeUTC.GetMonth()
+    americanOffsetFromUTC = -18000 ' EST (UTC-5)
+    if currentMonth >= 3 and currentMonth <= 10
+        americanOffsetFromUTC = -14400 ' EDT (UTC-4)
+    end if
+    
+    currentSecondsEST = dateTimeUTC.AsSeconds() + americanOffsetFromUTC
+    dateTimeEST = CreateObject("roDateTime")
+    dateTimeEST.FromSeconds(currentSecondsEST)
+    
+    ' Get day of month for both
+    localDay = dateTimeLocal.GetDayOfMonth()
+    estDay = dateTimeEST.GetDayOfMonth()
+    
+    ' Calculate day difference (EST day - local day)
+    dayDifference = estDay - localDay
+    
+    ' Adjust API dayOffset to request EST's day
+    apiDayOffset = m.dayOffset + dayDifference
+    
+    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] Local date: " + dateTimeLocal.GetMonth().ToStr() + "/" + localDay.ToStr()
+    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] EST date: " + dateTimeEST.GetMonth().ToStr() + "/" + estDay.ToStr()
+    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] Day difference: " + dayDifference.ToStr()
+    print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] API dayOffset (adjusted): " + apiDayOffset.ToStr()
 
     m.tvGuideApiTask = CreateObject("roSGNode", "TVGuideApi")
     if m.tvGuideApiTask = invalid
@@ -156,11 +189,11 @@ sub loadTVGuideForSelectedDay()
         hideLoading()
         return
     end if
-    
+
     print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] ✓ TVGuideApi task created"
     m.tvGuideApiTask.observeField("responseData", "onTVGuideDataReceived")
     m.tvGuideApiTask.observeField("errorMessage", "onTVGuideError")
-    m.tvGuideApiTask.dayOffset = m.dayOffset
+    m.tvGuideApiTask.dayOffset = apiDayOffset
     print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] ✓ Starting API task..."
     m.tvGuideApiTask.control = "run"
     print "TVGuideScreen.brs - [loadTVGuideForSelectedDay] ✓ API task started"
@@ -732,6 +765,12 @@ sub returnFocusToNavigation()
     ' Return focus to the navigation bar (TV Guide icon)
     print "TVGuideScreen.brs - [returnFocusToNavigation] Returning focus to navigation bar"
     
+    ' Stop video player when navigating back
+    if m.videoPlayer <> invalid
+        m.videoPlayer.control = "stop"
+        print "TVGuideScreen.brs - [returnFocusToNavigation] Stopped video player"
+    end if
+    
     ' Walk up the parent chain to find the home scene
     parentScene = m.top.getParent()
     maxDepth = 10
@@ -787,10 +826,12 @@ sub ensureChannelWindowForIndex(channelIndex as integer)
 end sub
 
 sub updateHeaderTime()
-    dateTime = CreateObject("roDateTime")
-    dateTime.ToLocalTime()
-    hours = dateTime.GetHours()
-    minutes = dateTime.GetMinutes()
+    ' Display current time in local timezone
+    dateTimeLocal = CreateObject("roDateTime")
+    dateTimeLocal.ToLocalTime()
+    
+    hours = dateTimeLocal.GetHours()
+    minutes = dateTimeLocal.GetMinutes()
     
     ' 12-hour format with AM/PM
     ampm = "AM"
@@ -864,11 +905,41 @@ sub loadTVGuideData(tvGuideData as object)
     
     print "TVGuideScreen.brs - [loadTVGuideData] m.channelsData count: " + m.channelsData.Count().ToStr()
     if m.channelsData.Count() > 0
+        ' Log first channel (Gusto TV)
         firstChannel = m.channelsData[0]
-        print "TVGuideScreen.brs - [loadTVGuideData] First channel keys: " + FormatJson(firstChannel.Keys())
-        if firstChannel.shows <> invalid
-            print "TVGuideScreen.brs - [loadTVGuideData] First channel has " + firstChannel.shows.Count().ToStr() + " shows"
+        channelName = "Unknown"
+        if firstChannel.title <> invalid then channelName = firstChannel.title
+        if firstChannel.name <> invalid then channelName = firstChannel.name
+        print "TVGuideScreen.brs - [loadTVGuideData] ========== FIRST CHANNEL: " + channelName + " =========="
+        print "TVGuideScreen.brs - [loadTVGuideData] Channel keys: " + FormatJson(firstChannel.Keys())
+        
+        if firstChannel.shows <> invalid and firstChannel.shows.Count() > 0
+            print "TVGuideScreen.brs - [loadTVGuideData] Total shows: " + firstChannel.shows.Count().ToStr()
+            print "TVGuideScreen.brs - [loadTVGuideData] First 10 shows:"
+            for i = 0 to 9
+                if i < firstChannel.shows.Count()
+                    show = firstChannel.shows[i]
+                    
+                    showName = "NO_NAME"
+                    if show.name <> invalid then showName = show.name
+                    if show.title <> invalid then showName = show.title
+                    
+                    showStart = "NO_START"
+                    if show.start <> invalid then showStart = show.start
+                    
+                    showEnd = "NO_END"
+                    if show.end <> invalid then showEnd = show.end
+                    
+                    showTZ = "NO_TZ"
+                    if show.timezone <> invalid then showTZ = show.timezone
+                    
+                    print "TVGuideScreen.brs - [loadTVGuideData]   " + i.ToStr() + ": [" + showName + "] " + showStart + " - " + showEnd + " (TZ: " + showTZ + ")"
+                end if
+            end for
+        else
+            print "TVGuideScreen.brs - [loadTVGuideData] ERROR: No shows data!"
         end if
+        print "TVGuideScreen.brs - [loadTVGuideData] ================================"
     end if
     
     ' Build TimeGrid content
@@ -903,58 +974,101 @@ sub buildTimeGridContent()
         return
     end if
     
-    ' Get current date/time for contentStartTime
-    ' IMPORTANT: Work in UTC since API times are in UTC
+    ' Get current date/time
+    ' API returns times in EST (e.g., "00:00" = midnight EST, "16:15" = 4:15 PM EST)
+    ' Goal: Display these EST times directly on TimeGrid (show "00:00" as 12:00 AM, "16:15" as 4:15 PM)
+    ' TimeGrid interprets timestamps in LOCAL timezone, so we need to create "fake" timestamps
+    ' that display the EST wall-clock time when interpreted as local time
+    
     dateTimeUTC = CreateObject("roDateTime")
-    ' Do NOT call ToLocalTime() - keep in UTC to match API data
+    dateTimeLocal = CreateObject("roDateTime")
+    dateTimeLocal.ToLocalTime()
     
-    ' Calculate start of today (midnight 00:00:00) in UTC
     currentSecondsUTC = dateTimeUTC.AsSeconds()
-    currentHourUTC = dateTimeUTC.GetHours()
-    currentMinuteUTC = dateTimeUTC.GetMinutes()
-    currentSecondUTC = dateTimeUTC.GetSeconds()
+    currentSecondsLocal = dateTimeLocal.AsSeconds()
+    localOffsetFromUTC = currentSecondsLocal - currentSecondsUTC
     
-    ' Calculate seconds since midnight (UTC)
-    secondsSinceMidnightUTC = (currentHourUTC * 3600) + (currentMinuteUTC * 60) + currentSecondUTC
+    ' Calculate EST offset
+    currentMonth = dateTimeUTC.GetMonth()
+    americanOffsetFromUTC = -18000 ' EST (UTC-5)
+    if currentMonth >= 3 and currentMonth <= 10
+        americanOffsetFromUTC = -14400 ' EDT (UTC-4)
+    end if
     
-    ' Get midnight timestamp by subtracting seconds since midnight (UTC)
-    midnightSecondsUTC = currentSecondsUTC - secondsSinceMidnightUTC
+    ' Calculate timezone offset from EST to local
+    ' If local is UTC+4 and EST is UTC-5, offset is +9 hours (32400 seconds)
+    timezoneOffsetESTtoLocal = localOffsetFromUTC - americanOffsetFromUTC
     
-    ' Adjust for day offset (0 = today, -1 = yesterday, etc.)
-    dayAdjustment = m.dayOffset * 86400 ' 86400 seconds per day
-    startOfDaySecondsUTC = midnightSecondsUTC + dayAdjustment
+    ' Get local time info
+    currentHourLocal = dateTimeLocal.GetHours()
+    currentMinuteLocal = dateTimeLocal.GetMinutes()
+    currentSecondLocal = dateTimeLocal.GetSeconds()
+    secondsSinceMidnightLocal = (currentHourLocal * 3600) + (currentMinuteLocal * 60) + currentSecondLocal
     
-    ' TimeGrid expects Unix timestamp in seconds (UTC)
-    m.timeGrid.contentStartTime = startOfDaySecondsUTC
+    ' Calculate EST midnight as UTC timestamp
+    ' Step 1: Get current UTC time
+    ' Step 2: Convert to EST
+    currentSecondsEST = currentSecondsUTC + americanOffsetFromUTC
+    dateTimeEST = CreateObject("roDateTime")
+    dateTimeEST.FromSeconds(currentSecondsEST)
+    
+    currentHourEST = dateTimeEST.GetHours()
+    currentMinuteEST = dateTimeEST.GetMinutes()
+    secondsSinceMidnightEST = (currentHourEST * 3600) + (currentMinuteEST * 60)
+    
+    ' Step 3: Get EST midnight (still as a timestamp with EST offset)
+    midnightSecondsEST = currentSecondsEST - secondsSinceMidnightEST
+    
+    ' Step 4: Convert EST midnight back to UTC
+    midnightESTasUTC = midnightSecondsEST - americanOffsetFromUTC
+    
+    ' Step 5: Use UTC timestamp directly - TimeGrid will display in local time automatically
+    ' Don't add localOffsetFromUTC here, as roDateTime.ToLocalTime() does that internally
+    startOfDaySeconds = midnightESTasUTC
+    
+    print "TVGuideScreen.brs - [buildTimeGridContent] ========== TIMEZONE DEBUG =========="
+    print "TVGuideScreen.brs - [buildTimeGridContent] Current local time: " + currentHourLocal.ToStr() + ":" + currentMinuteLocal.ToStr()
+    print "TVGuideScreen.brs - [buildTimeGridContent] Current EST time: " + currentHourEST.ToStr() + ":" + currentMinuteEST.ToStr()
+    print "TVGuideScreen.brs - [buildTimeGridContent] EST midnight (with offset): " + midnightSecondsEST.ToStr()
+    print "TVGuideScreen.brs - [buildTimeGridContent] EST midnight as UTC: " + midnightESTasUTC.ToStr()
+    print "TVGuideScreen.brs - [buildTimeGridContent] Converted to local timestamp: " + startOfDaySeconds.ToStr()
+    
+    ' Verify what this displays as
+    debugMidnight = CreateObject("roDateTime")
+    debugMidnight.FromSeconds(startOfDaySeconds)
+    debugMidnight.ToLocalTime()
+    print "TVGuideScreen.brs - [buildTimeGridContent] >>> EST midnight will display as: " + debugMidnight.GetHours().ToStr() + ":" + debugMidnight.GetMinutes().ToStr() + " local (should be ~9:00 AM)"
+    print "TVGuideScreen.brs - [buildTimeGridContent] ================================"
+    
+    ' Adjust for day offset
+    dayAdjustment = m.dayOffset * 86400
+    startOfDaySeconds = startOfDaySeconds + dayAdjustment
+    
+    m.timeGrid.contentStartTime = startOfDaySeconds
     
     ' Set duration to visible window (2.5 hours = 9000 seconds)
-    ' This is how much time is shown at once, user can scroll to see more
     m.timeGrid.duration = 9000
     
-    ' Set maxDays to 1 (24 hours of scrollable content)
-    m.timeGrid.maxDays = 1
+    ' Set maxDays to 4 (4 days of scrollable content: yesterday, today, tomorrow, +1 more day)
+    m.timeGrid.maxDays = 4
     
     ' Calculate leftEdgeTargetTime (but set it AFTER content is set)
-    targetTime = startOfDaySecondsUTC
+    targetTime = startOfDaySeconds
     if m.dayOffset = 0 then
-        ' For today, start at current time rounded to 30-min (UTC)
-        currentTimeRoundedUTC = currentSecondsUTC - (currentSecondsUTC mod 1800)
-        targetTime = currentTimeRoundedUTC
+        ' For today, show current local time (rounded to 30-min)
+        targetTime = currentSecondsLocal - (currentSecondsLocal mod 1800)
         
-        ' Debug: Show UTC and local times for comparison
-        dateTimeLocal = CreateObject("roDateTime")
-        dateTimeLocal.ToLocalTime()
-        print "TVGuideScreen.brs - [buildTimeGridContent] ========== TIME DEBUG =========="
-        print "TVGuideScreen.brs - [buildTimeGridContent] Current UTC: " + currentSecondsUTC.ToStr() + " (" + dateTimeUTC.ToISOString() + ")"
-        print "TVGuideScreen.brs - [buildTimeGridContent] Current Local: " + dateTimeLocal.AsSeconds().ToStr() + " (" + dateTimeLocal.ToISOString() + ")"
-        print "TVGuideScreen.brs - [buildTimeGridContent] Rounded UTC: " + currentTimeRoundedUTC.ToStr()
-        print "TVGuideScreen.brs - [buildTimeGridContent] Midnight UTC: " + midnightSecondsUTC.ToStr()
-        print "TVGuideScreen.brs - [buildTimeGridContent] ContentStartTime: " + startOfDaySecondsUTC.ToStr()
+        print "TVGuideScreen.brs - [buildTimeGridContent] ========== TIME DEBUG (TODAY) =========="
+        print "TVGuideScreen.brs - [buildTimeGridContent] Current local time: " + currentHourLocal.ToStr() + ":" + currentMinuteLocal.ToStr()
+        print "TVGuideScreen.brs - [buildTimeGridContent] Target time (rounded): " + targetTime.ToStr()
+        
+        verifyDisplay = CreateObject("roDateTime")
+        verifyDisplay.FromSeconds(targetTime)
+        verifyDisplay.ToLocalTime()
+        print "TVGuideScreen.brs - [buildTimeGridContent] >>> TimeGrid will show: " + verifyDisplay.GetHours().ToStr() + ":" + verifyDisplay.GetMinutes().ToStr()
         print "TVGuideScreen.brs - [buildTimeGridContent] ================================"
     else
-        ' For past days, start at midnight
-        targetTime = startOfDaySecondsUTC
-        print "TVGuideScreen.brs - [buildTimeGridContent] Past day - starting at UTC midnight: " + startOfDaySecondsUTC.ToStr()
+        targetTime = startOfDaySeconds
     end if
     
     ' Create root content node
@@ -1022,6 +1136,11 @@ sub buildTimeGridContent()
                 
                 ' Parse start and end times
                 if show.start <> invalid and show.end <> invalid
+                    ' Debug: Log first few program times to verify API timezone
+                    if channelNode.getChildCount() < 3
+                        print "TVGuideScreen.brs - [buildTimeGridContent] Program: " + show.name + " | Start: " + show.start + " | End: " + show.end
+                    end if
+                    
                     ' Parse "HH:MM" format
                     startParts = show.start.Split(":")
                     endParts = show.end.Split(":")
@@ -1032,26 +1151,39 @@ sub buildTimeGridContent()
                         endHour = Val(endParts[0])
                         endMin = Val(endParts[1])
                         
-                        ' Calculate seconds from midnight for start time
-                        startSecondsFromMidnight = (startHour * 3600) + (startMin * 60)
+                        ' Calculate seconds from midnight for start time (EST)
+                        startSecondsFromMidnightEST = (startHour * 3600) + (startMin * 60)
                         
-                        ' Calculate seconds from midnight for end time
-                        endSecondsFromMidnight = (endHour * 3600) + (endMin * 60)
+                        ' Calculate seconds from midnight for end time (EST)
+                        endSecondsFromMidnightEST = (endHour * 3600) + (endMin * 60)
                         
                         ' Handle programs spanning midnight
-                        if endSecondsFromMidnight <= startSecondsFromMidnight
-                            endSecondsFromMidnight = endSecondsFromMidnight + 86400
+                        if endSecondsFromMidnightEST <= startSecondsFromMidnightEST
+                            endSecondsFromMidnightEST = endSecondsFromMidnightEST + 86400
                         end if
                         
-                        ' Set PLAYSTART (Unix timestamp) and PLAYDURATION (seconds)
-                        ' TimeGrid documentation uses uppercase field names
-                        ' startOfDaySecondsUTC is calculated earlier in buildTimeGridContent (in UTC)
-                        ' API times are in UTC, so we add them to UTC midnight
-                        programNode.PLAYSTART = startOfDaySecondsUTC + startSecondsFromMidnight
-                        programNode.PLAYDURATION = endSecondsFromMidnight - startSecondsFromMidnight
-                        ' Also set lowercase for compatibility
-                        programNode.playStart = startOfDaySecondsUTC + startSecondsFromMidnight
-                        programNode.playDuration = endSecondsFromMidnight - startSecondsFromMidnight
+                        ' Calculate duration first
+                        programDurationSeconds = endSecondsFromMidnightEST - startSecondsFromMidnightEST
+                        
+                        ' Set PLAYSTART and PLAYDURATION
+                        ' startOfDaySeconds is EST midnight as UTC timestamp
+                        ' Just add the EST seconds directly - TimeGrid will display in local time automatically
+                        programNode.PLAYSTART = startOfDaySeconds + startSecondsFromMidnightEST
+                        programNode.PLAYDURATION = programDurationSeconds
+                        programNode.playStart = startOfDaySeconds + startSecondsFromMidnightEST
+                        programNode.playDuration = programDurationSeconds
+                        
+                        ' Debug: Log calculated timestamp for first few programs
+                        if channelNode.getChildCount() < 5
+                            print "TVGuideScreen.brs - [buildTimeGridContent]   API time: " + show.start + " EST"
+                            print "TVGuideScreen.brs - [buildTimeGridContent]   Seconds from midnight EST: " + startSecondsFromMidnightEST.ToStr()
+                            print "TVGuideScreen.brs - [buildTimeGridContent]   PLAYSTART timestamp: " + programNode.PLAYSTART.ToStr()
+                            
+                            debugProgramTime = CreateObject("roDateTime")
+                            debugProgramTime.FromSeconds(programNode.PLAYSTART)
+                            debugProgramTime.ToLocalTime()
+                            print "TVGuideScreen.brs - [buildTimeGridContent]   >>> Will display at: " + debugProgramTime.GetHours().ToStr() + ":" + debugProgramTime.GetMinutes().ToStr() + " local"
+                        end if
                         
                         ' Store display times
                         programNode.addFields({
@@ -1077,6 +1209,18 @@ sub buildTimeGridContent()
     m.timeGrid.leftEdgeTargetTime = targetTime
     print "TVGuideScreen.brs - [buildTimeGridContent] Set leftEdgeTargetTime to: " + targetTime.ToStr()
     
+    ' Debug: Show what time this timestamp represents
+    debugTime = CreateObject("roDateTime")
+    debugTime.FromSeconds(targetTime)
+    print "TVGuideScreen.brs - [buildTimeGridContent] leftEdgeTargetTime as date: " + debugTime.ToISOString()
+    print "TVGuideScreen.brs - [buildTimeGridContent] leftEdgeTargetTime hour: " + debugTime.GetHours().ToStr() + ":" + debugTime.GetMinutes().ToStr()
+    
+    ' Also log contentStartTime
+    debugStart = CreateObject("roDateTime")
+    debugStart.FromSeconds(m.timeGrid.contentStartTime)
+    print "TVGuideScreen.brs - [buildTimeGridContent] contentStartTime as date: " + debugStart.ToISOString()
+    print "TVGuideScreen.brs - [buildTimeGridContent] contentStartTime hour: " + debugStart.GetHours().ToStr() + ":" + debugStart.GetMinutes().ToStr()
+    
     ' Auto-focus to current program for "Today"
     if m.dayOffset = 0
         autoFocusToCurrentProgram()
@@ -1093,7 +1237,10 @@ sub autoFocusToCurrentProgram()
     channel = content.getChild(0)
     if channel = invalid or channel.getChildCount() = 0 then return
     
-    currentTime = m.timeGrid.leftEdgeTargetTime
+    ' Get current time as UTC timestamp (to match PLAYSTART which is in UTC)
+    dateTimeUTC = CreateObject("roDateTime")
+    currentTimeUTC = dateTimeUTC.AsSeconds()
+    
     isNowProgramAvailable = false
     nowProgramIndex = 0
     
@@ -1105,7 +1252,7 @@ sub autoFocusToCurrentProgram()
         if programStart = invalid then programStart = program.playStart
         if programDuration = invalid then programDuration = program.playDuration
         
-        if programStart <= currentTime and (programStart + programDuration) >= currentTime
+        if programStart <= currentTimeUTC and (programStart + programDuration) >= currentTimeUTC
             isNowProgramAvailable = true
             nowProgramIndex = i
             exit for
@@ -1114,13 +1261,13 @@ sub autoFocusToCurrentProgram()
     
     if isNowProgramAvailable
         print "TVGuideScreen.brs - [autoFocusToCurrentProgram] Focusing on current program at index: " + nowProgramIndex.ToStr()
+        m.timeGrid.jumpToChannel = 0
         m.timeGrid.jumpToProgram = nowProgramIndex
     else
         print "TVGuideScreen.brs - [autoFocusToCurrentProgram] No current program found, focusing on first program"
+        m.timeGrid.jumpToChannel = 0
         m.timeGrid.jumpToProgram = 0
-        ' KEEP leftEdgeTargetTime at current time - don't jump to first program
-        ' This ensures TimeGrid shows current time, even if there's no program data
-        print "TVGuideScreen.brs - [autoFocusToCurrentProgram] Keeping TimeGrid at current time (not jumping to first program)"
+        print "TVGuideScreen.brs - [autoFocusToCurrentProgram] Keeping TimeGrid at current time"
     end if
 end sub
 
@@ -1190,12 +1337,27 @@ sub buildTimelineHeader()
     startHour = m.timelineStartHour
     startMinute = m.timelineStartMinute
     
-    ' If not yet initialized, calculate from current time
+    ' If not yet initialized, calculate from current American Eastern Time
     if m.timelineStartTotalMinutes = 0
-        dateTime = CreateObject("roDateTime")
-        dateTime.ToLocalTime()
-        currentHour = dateTime.GetHours()
-        currentMinute = dateTime.GetMinutes()
+        ' Get current time in American Eastern Time
+        dateTimeUTC = CreateObject("roDateTime")
+        currentMonth = dateTimeUTC.GetMonth()
+        
+        ' Calculate American offset (EST or EDT)
+        americanOffset = -18000 ' EST (UTC-5)
+        if currentMonth >= 3 and currentMonth <= 10
+            americanOffset = -14400 ' EDT (UTC-4)
+        end if
+        
+        ' Convert to American time
+        currentSecondsUTC = dateTimeUTC.AsSeconds()
+        currentSecondsAmerican = currentSecondsUTC + americanOffset
+        
+        dateTimeAmerican = CreateObject("roDateTime")
+        dateTimeAmerican.FromSeconds(currentSecondsAmerican)
+        
+        currentHour = dateTimeAmerican.GetHours()
+        currentMinute = dateTimeAmerican.GetMinutes()
         
         ' Round to nearest 30 minutes
         if currentMinute < 30
@@ -1208,6 +1370,8 @@ sub buildTimelineHeader()
         m.timelineStartHour = startHour
         m.timelineStartMinute = startMinute
         m.timelineStartTotalMinutes = startHour * 60 + startMinute
+        
+        print "TVGuideScreen.brs - [buildTimelineHeader] Initialized timeline to American time: " + startHour.ToStr() + ":" + startMinute.ToStr()
     end if
     
     ' Remove existing time labels (keep the background rectangle)
@@ -1227,14 +1391,19 @@ sub buildTimelineHeader()
         ' Handle day overflow
         if slotHour >= 24 then slotHour = slotHour - 24
         
-        ' Format time string (HH:MM)
-        hourStr = slotHour.ToStr()
-        if slotHour < 10 then hourStr = "0" + hourStr
+        ' Format time string in 12-hour American format (h:MM AM/PM)
+        displayHour = slotHour
+        ampm = "AM"
+        if slotHour >= 12
+            ampm = "PM"
+            if slotHour > 12 then displayHour = slotHour - 12
+        end if
+        if displayHour = 0 then displayHour = 12
         
         minuteStr = slotMinute.ToStr()
         if slotMinute < 10 then minuteStr = "0" + minuteStr
         
-        timeStr = hourStr + ":" + minuteStr
+        timeStr = displayHour.ToStr() + ":" + minuteStr + " " + ampm
         
         ' Create label: 18px font, #B0B8C4 color
         timeLabel = CreateObject("roSGNode", "Label")
@@ -1274,10 +1443,25 @@ sub buildProgramGrid()
     
     ' Use stored timeline position or calculate if not set
     if m.timelineStartTotalMinutes = 0
-        dateTime = CreateObject("roDateTime")
-        dateTime.ToLocalTime()
-        currentHour = dateTime.GetHours()
-        currentMinute = dateTime.GetMinutes()
+        ' Get current time in American Eastern Time
+        dateTimeUTC = CreateObject("roDateTime")
+        currentMonth = dateTimeUTC.GetMonth()
+        
+        ' Calculate American offset (EST or EDT)
+        americanOffset = -18000 ' EST (UTC-5)
+        if currentMonth >= 3 and currentMonth <= 10
+            americanOffset = -14400 ' EDT (UTC-4)
+        end if
+        
+        ' Convert to American time
+        currentSecondsUTC = dateTimeUTC.AsSeconds()
+        currentSecondsAmerican = currentSecondsUTC + americanOffset
+        
+        dateTimeAmerican = CreateObject("roDateTime")
+        dateTimeAmerican.FromSeconds(currentSecondsAmerican)
+        
+        currentHour = dateTimeAmerican.GetHours()
+        currentMinute = dateTimeAmerican.GetMinutes()
         
         if currentMinute < 30
             m.timelineStartMinute = 0
@@ -1286,6 +1470,8 @@ sub buildProgramGrid()
         end if
         m.timelineStartHour = currentHour
         m.timelineStartTotalMinutes = m.timelineStartHour * 60 + m.timelineStartMinute
+        
+        print "TVGuideScreen.brs - [buildProgramGrid] Initialized timeline to American time: " + m.timelineStartHour.ToStr() + ":" + m.timelineStartMinute.ToStr()
     end if
     
     ' Clear existing blocks
@@ -1409,8 +1595,14 @@ function createProgramBlock(title as string, startTime as string, endTime as str
     
     timeLabel = CreateObject("roSGNode", "Label")
     timeText = ""
-    if startTime <> "" then timeText = startTime
-    if endTime <> "" then timeText = timeText + " – " + endTime
+    ' Convert times to American 12-hour format
+    if startTime <> ""
+        timeText = convertTo12HourFormat(startTime)
+    end if
+    if endTime <> ""
+        if timeText <> "" then timeText = timeText + " – "
+        timeText = timeText + convertTo12HourFormat(endTime)
+    end if
     timeLabel.text = timeText
     timeLabel.translation = [18, 56]
     timeLabel.width = Int(blockWidth) - 36
@@ -1501,11 +1693,25 @@ end function
 
 
 sub updateCurrentTimeIndicator()
-    ' Calculate position of current time indicator
-    dateTime = CreateObject("roDateTime")
-    dateTime.ToLocalTime()
-    currentHour = dateTime.GetHours()
-    currentMinute = dateTime.GetMinutes()
+    ' Calculate position of current time indicator using American Eastern Time
+    dateTimeUTC = CreateObject("roDateTime")
+    currentMonth = dateTimeUTC.GetMonth()
+    
+    ' Calculate American offset (EST or EDT)
+    americanOffset = -18000 ' EST (UTC-5)
+    if currentMonth >= 3 and currentMonth <= 10
+        americanOffset = -14400 ' EDT (UTC-4)
+    end if
+    
+    ' Convert to American time
+    currentSecondsUTC = dateTimeUTC.AsSeconds()
+    currentSecondsAmerican = currentSecondsUTC + americanOffset
+    
+    dateTimeAmerican = CreateObject("roDateTime")
+    dateTimeAmerican.FromSeconds(currentSecondsAmerican)
+    
+    currentHour = dateTimeAmerican.GetHours()
+    currentMinute = dateTimeAmerican.GetMinutes()
     currentTotalMinutes = currentHour * 60 + currentMinute
     
     ' Only show current time indicator for Today
@@ -1725,3 +1931,33 @@ sub playChannel(channel as object)
     '     contentType: "live"
     ' })
 end sub
+
+function convertTo12HourFormat(time24 as string) as string
+    ' Convert 24-hour format (HH:MM) to 12-hour American format (h:MM AM/PM)
+    if time24 = invalid or time24 = ""
+        return ""
+    end if
+    
+    parts = time24.Split(":")
+    if parts.Count() < 2
+        return time24 ' Return as-is if not in expected format
+    end if
+    
+    hour = Val(parts[0])
+    minute = Val(parts[1])
+    
+    ' Convert to 12-hour format
+    ampm = "AM"
+    displayHour = hour
+    if hour >= 12
+        ampm = "PM"
+        if hour > 12 then displayHour = hour - 12
+    end if
+    if displayHour = 0 then displayHour = 12
+    
+    ' Format minutes with leading zero
+    minuteStr = minute.ToStr()
+    if minute < 10 then minuteStr = "0" + minuteStr
+    
+    return displayHour.ToStr() + ":" + minuteStr + " " + ampm
+end function

@@ -51,6 +51,10 @@ sub init()
     m.userChannelsSignupUsername = ""
     m.userChannelsSignupPassword = ""
     
+    ' Store last focused position for restoring focus when returning from detail screens
+    m.lastFocusedRow = 0
+    m.lastFocusedItem = 0
+    
     ' Set up RowList event handlers
     m.contentRowList.observeField("itemSelected", "onItemSelected")
     m.contentRowList.observeField("itemFocused", "onItemFocused")
@@ -78,6 +82,97 @@ sub onFocusChanged()
         setInitialFocus()
     else
         print "DynamicContentScreen.brs - [onFocusChanged] Screen lost focus"
+    end if
+end sub
+
+sub onVisibleChanged()
+    print "DynamicContentScreen.brs - [onVisibleChanged] Visible changed: " + m.top.visible.ToStr()
+    
+    ' When screen becomes visible again (returning from detail screen), restore focus
+    if m.top.visible = true
+        print "DynamicContentScreen.brs - [onVisibleChanged] Screen became visible, checking if we should restore focus"
+        
+        ' Set focus on the screen first
+        m.top.setFocus(true)
+        
+        ' Only restore focus if content is loaded and visible
+        if m.contentRowList <> invalid and m.contentRowList.visible = true and m.contentRowList.content <> invalid
+            contentCount = m.contentRowList.content.getChildCount()
+            if contentCount > 0 and m.lastFocusedRow >= 0 and m.lastFocusedItem >= 0
+                ' Restore focus to last selected position with a small delay
+                print "DynamicContentScreen.brs - [onVisibleChanged] Restoring focus to position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+                
+                ' Create a timer for delayed focus restoration (allows screen to fully render)
+                if m.focusRestoreTimer = invalid
+                    m.focusRestoreTimer = CreateObject("roSGNode", "Timer")
+                    m.focusRestoreTimer.duration = 0.3
+                    m.focusRestoreTimer.repeat = false
+                    m.focusRestoreTimer.observeField("fire", "onFocusRestoreTimer")
+                end if
+                m.focusRestoreTimer.control = "start"
+            else
+                ' No stored position, just focus the content list at current position
+                print "DynamicContentScreen.brs - [onVisibleChanged] No stored position, focusing content at current position"
+                m.contentRowList.setFocus(true)
+            end if
+        end if
+    end if
+end sub
+
+sub onRestoreFocusRequested()
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] Focus restoration requested"
+    
+    if m.top.restoreFocusRequested = true
+        ' Reset the flag
+        m.top.restoreFocusRequested = false
+        
+        ' Restore focus to last selected item with a timer
+        if m.contentRowList <> invalid and m.contentRowList.visible = true and m.contentRowList.content <> invalid
+            contentCount = m.contentRowList.content.getChildCount()
+            if contentCount > 0 and m.lastFocusedRow >= 0 and m.lastFocusedItem >= 0
+                print "DynamicContentScreen.brs - [onRestoreFocusRequested] Starting focus restoration timer"
+                
+                ' Create a timer for delayed focus restoration
+                if m.focusRestoreTimer = invalid
+                    m.focusRestoreTimer = CreateObject("roSGNode", "Timer")
+                    m.focusRestoreTimer.duration = 0.2
+                    m.focusRestoreTimer.repeat = false
+                    m.focusRestoreTimer.observeField("fire", "onFocusRestoreTimer")
+                end if
+                m.focusRestoreTimer.control = "start"
+            else
+                ' No stored position, just focus the content list
+                print "DynamicContentScreen.brs - [onRestoreFocusRequested] No stored position, focusing content"
+                m.contentRowList.setFocus(true)
+            end if
+        end if
+    end if
+end sub
+
+sub onFocusRestoreTimer()
+    print "DynamicContentScreen.brs - [onFocusRestoreTimer] Restoring focus after delay"
+    
+    if m.contentRowList <> invalid and m.contentRowList.content <> invalid
+        contentCount = m.contentRowList.content.getChildCount()
+        
+        ' Validate the stored position is still valid
+        if m.lastFocusedRow >= 0 and m.lastFocusedRow < contentCount
+            rowContent = m.contentRowList.content.getChild(m.lastFocusedRow)
+            if rowContent <> invalid and m.lastFocusedItem >= 0 and m.lastFocusedItem < rowContent.getChildCount()
+                ' Set focus position using jumpToRowItem
+                m.contentRowList.jumpToRowItem = [m.lastFocusedRow, m.lastFocusedItem]
+                m.contentRowList.setFocus(true)
+                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Focus restored to [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+            else
+                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored item position invalid, focusing content at [0,0]"
+                m.contentRowList.jumpToRowItem = [0, 0]
+                m.contentRowList.setFocus(true)
+            end if
+        else
+            print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored row position invalid, focusing content at [0,0]"
+            m.contentRowList.jumpToRowItem = [0, 0]
+            m.contentRowList.setFocus(true)
+        end if
     end if
 end sub
 
@@ -386,6 +481,13 @@ sub loadContentForType()
     print "DynamicContentScreen.brs - [loadContentForType] Screen translation: [" + m.top.translation[0].ToStr() + ", " + m.top.translation[1].ToStr() + "]"
     print "DynamicContentScreen.brs - [loadContentForType] This should load different content for different IDs"
     
+    ' Special handling for Personal page (contentTypeId = 16) - show hardcoded M3U item
+    if contentTypeId = 16
+        print "DynamicContentScreen.brs - [loadContentForType] *** PERSONAL PAGE DETECTED - Loading hardcoded M3U item ***"
+        loadPersonalPageContent()
+        return
+    end if
+    
     ' Show global loading state
     parentScene = m.top.getParent()
     if parentScene <> invalid
@@ -409,6 +511,50 @@ sub loadContentForType()
     print "DynamicContentScreen.brs - [loadContentForType] Created DynamicContentApi with contentTypeId: " + contentTypeId.ToStr()
     print "DynamicContentScreen.brs - [loadContentForType] Starting API call..."
     m.contentApi.control = "RUN"
+end sub
+
+sub loadPersonalPageContent()
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] *** Loading hardcoded M3U content for Personal page ***"
+    
+    ' Create content node with hardcoded M3U item
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    
+    ' Create a single row for "Shared Channels"
+    rowNode = contentNode.createChild("ContentNode")
+    rowNode.title = "Shared Channels"
+    
+    ' Create M3U playlist item
+    m3uItem = rowNode.createChild("ContentNode")
+    m3uItem.title = "Samsung USA Channels"
+    m3uItem.description = "Live TV channels from Samsung TV Plus"
+    m3uItem.HDPosterUrl = "pkg:/images/background.png"
+    m3uItem.FHDPosterUrl = "pkg:/images/background.png"
+    
+    ' Store M3U URL in a custom field
+    m3uItem.m3uUrl = "https://apsattv.com/ssungusa.m3u"
+    m3uItem.contentType = "m3u_playlist"
+    m3uItem.typeId = 99 ' Custom type ID for M3U playlists
+    
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] Created M3U item with URL: " + m3uItem.m3uUrl
+    
+    ' Set content to RowList
+    m.contentRowList.content = contentNode
+    m.contentRowList.visible = true
+    m.noContentGroup.visible = false
+    
+    ' Hide loading state
+    hideLoadingState()
+    
+    ' Hide global loader
+    parentScene = m.top.getParent()
+    if parentScene <> invalid
+        parentScene.callFunc("hideGlobalLoader")
+    end if
+    
+    ' Build display with proper sizing (this will call returnFocusToNavigation)
+    buildContentDisplay(contentNode)
+    
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] Personal page content loaded successfully"
 end sub
 
 sub showLoadingState()
@@ -803,16 +949,30 @@ sub buildContentDisplay(contentItems as object)
         m.contentRowList.itemSize = [1920, 420]  ' Max row height
         m.contentRowList.rowLabelOffset = [[0, 8]]  ' Bring titles closer to items
         
-    ' Series (2), Live TV (3), User Channels (14), Age Restricted (15), Personal (16), TV Guide (17) - Landscape cards (4 per row + half peek)
-    else if m.top.contentTypeId = 2 or m.top.contentTypeId = 3 or m.top.contentTypeId = 14 or m.top.contentTypeId = 15 or m.top.contentTypeId = 16 or m.top.contentTypeId = 17
+    ' Age Restricted (15) - Landscape cards (5 per row)
+    else if m.top.contentTypeId = 15
+        print "DynamicContentScreen.brs - [buildContentDisplay] Age Restricted content detected, using SeriesItemComponent (5 per row)"
+        m.contentRowList.itemComponentName = "SeriesItemComponent"
+        
+        ' Size for 5 items per row: 320px width with 15px spacing
+        for i = 0 to contentNode.getChildCount() - 1
+            rowItemSizes.Push([320, 245])
+            rowHeights.Push(270.0)
+        end for
+        m.contentRowList.rowItemSize = rowItemSizes
+        m.contentRowList.rowHeights = rowHeights
+        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.itemSize = [1920, 290]
+        m.contentRowList.rowLabelOffset = [[0, 10]]
+        
+    ' Series (2), Live TV (3), User Channels (14), Personal (16), TV Guide (17) - Landscape cards (4 per row + half peek)
+    else if m.top.contentTypeId = 2 or m.top.contentTypeId = 3 or m.top.contentTypeId = 14 or m.top.contentTypeId = 16 or m.top.contentTypeId = 17
         if m.top.contentTypeId = 2
             print "DynamicContentScreen.brs - [buildContentDisplay] Series content detected, using SeriesItemComponent"
         else if m.top.contentTypeId = 3
             print "DynamicContentScreen.brs - [buildContentDisplay] Live TV content detected, using SeriesItemComponent"
         else if m.top.contentTypeId = 14
             print "DynamicContentScreen.brs - [buildContentDisplay] User Channels content detected, using SeriesItemComponent"
-        else if m.top.contentTypeId = 15
-            print "DynamicContentScreen.brs - [buildContentDisplay] Age Restricted content detected, using SeriesItemComponent"
         else if m.top.contentTypeId = 16
             print "DynamicContentScreen.brs - [buildContentDisplay] Personal content detected, using SeriesItemComponent"
         else if m.top.contentTypeId = 17
@@ -953,6 +1113,15 @@ sub onItemSelected()
                     end if
                     
                     print "DynamicContentScreen.brs - [onItemSelected] Content type: " + itemContentType + ", typeId: " + itemTypeId.ToStr()
+                    
+                    ' Check if this is an M3U Playlist (typeId = 99 or type = "m3u_playlist")
+                    if itemContentType = "m3u_playlist" or itemTypeId = 99
+                        print "DynamicContentScreen.brs - [onItemSelected] *** M3U PLAYLIST DETECTED - Navigating to M3UChannelScreen ***"
+                        
+                        ' Navigate to M3UChannelScreen for M3U playlist
+                        navigateToM3UScreen(selectedItem)
+                        return
+                    end if
                     
                     ' Check if this is a Series (typeId = 2 or type = "series")
                     if itemContentType = "series" or itemTypeId = 2
@@ -1320,8 +1489,15 @@ sub onItemSelected()
 end sub
 
 sub onItemFocused()
-    ' Simple logging for item focus - RowList handles focus automatically
-    print "DynamicContentScreen.brs - [onItemFocused] Item focus changed"
+    ' Store last focused position for restoring focus when returning from detail screens
+    if m.contentRowList <> invalid and m.contentRowList.itemFocused <> invalid
+        itemFocused = m.contentRowList.itemFocused
+        if Type(itemFocused) = "roArray" and itemFocused.Count() >= 2
+            m.lastFocusedRow = itemFocused[0]
+            m.lastFocusedItem = itemFocused[1]
+            print "DynamicContentScreen.brs - [onItemFocused] Stored focus position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+        end if
+    end if
 end sub
 
 ' Navigate to SeasonScreen for series content
@@ -1362,6 +1538,18 @@ sub navigateToSeasonScreen(selectedItem as object)
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] Type ID: " + typeId.ToStr()
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] Series Title: " + selectedItem.title
     
+    ' Store current selection for restoration when returning
+    if m.contentRowList <> invalid and m.contentRowList.itemFocused <> invalid
+        itemFocused = m.contentRowList.itemFocused
+        if Type(itemFocused) = "roArray" and itemFocused.Count() >= 2
+            m.lastFocusedRow = itemFocused[0]
+            m.lastFocusedItem = itemFocused[1]
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen] Stored focus position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+        else
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen] itemFocused is invalid or not an array"
+        end if
+    end if
+    
     ' Find the SeasonScreen component
     parentScene = m.top.getParent()
     while parentScene <> invalid
@@ -1385,6 +1573,64 @@ sub navigateToSeasonScreen(selectedItem as object)
     end while
     
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] ERROR: Could not find SeasonScreen"
+end sub
+
+' Navigate to M3UChannelScreen for M3U playlist
+sub navigateToM3UScreen(selectedItem as object)
+    print "DynamicContentScreen.brs - [navigateToM3UScreen] *** NAVIGATING TO M3U CHANNEL SCREEN ***"
+    
+    if selectedItem = invalid
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: selectedItem is invalid"
+        return
+    end if
+    
+    ' Get M3U URL from selected item
+    m3uUrl = ""
+    if selectedItem.m3uUrl <> invalid
+        m3uUrl = selectedItem.m3uUrl
+    end if
+    
+    if m3uUrl = ""
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: No M3U URL found in selected item"
+        return
+    end if
+    
+    print "DynamicContentScreen.brs - [navigateToM3UScreen] M3U URL: " + m3uUrl
+    print "DynamicContentScreen.brs - [navigateToM3UScreen] Playlist Title: " + selectedItem.title
+    
+    ' Find or create the M3UChannelScreen component
+    parentScene = m.top.getParent()
+    if parentScene <> invalid
+        m3uScreen = parentScene.findNode("m3uChannelScreen")
+        
+        if m3uScreen = invalid
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen not found, creating new one"
+            
+            ' Create M3UChannelScreen
+            m3uScreen = CreateObject("roSGNode", "M3UChannelScreen")
+            m3uScreen.id = "m3uChannelScreen"
+            m3uScreen.translation = [0, 0]
+            
+            ' Add to parent scene
+            parentScene.appendChild(m3uScreen)
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] Created and added M3UChannelScreen to scene"
+        else
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] Found existing M3UChannelScreen"
+        end if
+        
+        ' Hide current screen
+        m.top.visible = false
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] Hidden Personal content screen"
+        
+        ' Set M3U URL and show M3U screen
+        m3uScreen.m3uUrl = m3uUrl
+        m3uScreen.visible = true
+        m3uScreen.setFocus(true)
+        
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen shown and focused"
+    else
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: Could not find parent scene"
+    end if
 end sub
 
 ' Fetch series data with seasons and episodes using SeriesApi Task
@@ -2824,7 +3070,6 @@ sub onErrorDialogClosed()
     end if
 end sub
 
-sub showAuthorizationRequiredMessage()
 
 sub showAuthorizationRequiredMessage()
     ' Show modern authorization UI similar to Account screen

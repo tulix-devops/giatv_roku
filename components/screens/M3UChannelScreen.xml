@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="M3UChannelScreen" extends="Group">
+    <interface>
+        <field id="m3uUrl" type="string" onChange="onM3uUrlChanged"/>
+        <field id="visible" type="bool" value="false"/>
+    </interface>
+
+    <script type="text/brightscript" uri="M3UChannelScreen.brs"/>
+
+    <children>
+        <!-- Timer for polling responses -->
+        <Timer id="responseTimer" repeat="false" duration="0.1"/>
+        <!-- Background -->
+        <Rectangle
+            id="backgroundRect"
+            width="1920"
+            height="1080"
+            color="0x1A1A1AFF"/>
+
+        <!-- Header Group -->
+        <Group id="headerGroup" translation="[60, 40]">
+            <Label
+                id="headerTitle"
+                text="Samsung USA Channels"
+                font="font:BoldSystemFontFile,40"
+                color="0xFFFFFFFF"
+                translation="[0, 0]"/>
+            
+            <Rectangle
+                id="headerDivider"
+                width="1800"
+                height="2"
+                color="0x444444FF"
+                translation="[0, 60]"/>
+        </Group>
+
+        <!-- Loading Indicator -->
+        <Group id="loadingGroup" translation="[860, 490]" visible="false">
+            <BusySpinner
+                id="loadingSpinner"
+                poster="pkg:/images/spinner.png"
+                translation="[0, 0]"
+                width="200"
+                height="100"/>
+            <Label
+                id="loadingText"
+                text="Loading channels..."
+                font="font:MediumSystemFontFile,28"
+                color="0xCCCCCCFF"
+                translation="[0, 120]"
+                horizAlign="center"
+                width="200"/>
+        </Group>
+
+        <!-- Grid View for Channels -->
+        <RowList
+            id="channelGrid"
+            translation="[60, 140]"
+            itemComponentName="M3UChannelItem"
+            numRows="10"
+            rowHeights="[180]"
+            rowItemSize="[[320, 180]]"
+            rowItemSpacing="[[20, 20]]"
+            itemSize="[1800, 200]"
+            visible="false"
+            drawFocusFeedback="true"
+            vertFocusAnimationStyle="floatingFocus"
+            focusBitmapBlendColor="0x00A8E1FF"/>
+
+        <!-- Error Message -->
+        <Group id="errorGroup" translation="[560, 400]" visible="false">
+            <Rectangle
+                width="800"
+                height="280"
+                color="0x2A2A2AFF"
+                opacity="0.95"/>
+            <Label
+                id="errorTitle"
+                text="Error Loading Channels"
+                font="font:BoldSystemFontFile,32"
+                color="0xFF4444FF"
+                translation="[40, 40]"
+                width="720"
+                horizAlign="center"/>
+            <Label
+                id="errorMessage"
+                text=""
+                font="font:MediumSystemFontFile,24"
+                color="0xCCCCCCFF"
+                translation="[40, 100]"
+                width="720"
+                height="140"
+                horizAlign="center"
+                wrap="true"/>
+        </Group>
+    </children>
+</component>
