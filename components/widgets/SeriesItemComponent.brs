@@ -8,9 +8,17 @@ end sub
 sub OnContentSet()
     itemContent = m.top.itemContent
     
+    print "========== SeriesItemComponent.brs - OnContentSet CALLED =========="
+    
     if itemContent = invalid
+        print "SeriesItemComponent.brs - itemContent is INVALID!"
         return
     end if
+    
+    print "SeriesItemComponent.brs - itemContent.title: " + FormatJson(itemContent.title)
+    print "SeriesItemComponent.brs - itemContent.hdPosterUrl: " + FormatJson(itemContent.hdPosterUrl)
+    print "SeriesItemComponent.brs - itemContent.posterUrl: " + FormatJson(itemContent.posterUrl)
+    print "SeriesItemComponent.brs - itemContent.thumbnail: " + FormatJson(itemContent.thumbnail)
     
     ' Set poster image
     posterUrl = ""
@@ -18,6 +26,7 @@ sub OnContentSet()
     ' Try different image fields
     if itemContent.hdPosterUrl <> invalid and itemContent.hdPosterUrl <> ""
         posterUrl = itemContent.hdPosterUrl
+        print "SeriesItemComponent.brs - Using hdPosterUrl: " + posterUrl
     else if itemContent.sdPosterUrl <> invalid and itemContent.sdPosterUrl <> ""
         posterUrl = itemContent.sdPosterUrl
     else if itemContent.posterUrl <> invalid and itemContent.posterUrl <> ""
@@ -41,11 +50,16 @@ sub OnContentSet()
     end if
     
     if posterUrl <> ""
+        print "SeriesItemComponent.brs - Setting poster URI: " + posterUrl
         m.posterImage.uri = posterUrl
     else
+        print "SeriesItemComponent.brs - No poster found, using placeholder"
         ' Use landscape placeholder for Series/Live content
         m.posterImage.uri = "pkg:/images/png/poster_not_found_350x245.png"
     end if
+    
+    print "SeriesItemComponent.brs - Final poster URI: " + m.posterImage.uri
+    print "========== SeriesItemComponent.brs - OnContentSet END =========="
     
     ' Set title
     title = ""

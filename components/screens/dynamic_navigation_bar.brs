@@ -25,6 +25,7 @@ sub init()
     m.navItems = []
     m.dynamicNavItems = []
     m.currentIndex = 0
+    m.awaitingApiResponse = false
     print "DynamicNavigationBar.brs - [init] Initial currentIndex set to: " + m.currentIndex.ToStr()
     
     ' Note: Search screen removed - only dynamic content items will be added
@@ -40,12 +41,21 @@ sub init()
 end sub
 
 sub initializeNavigationApi()
+    print "DynamicNavigationBar.brs - [initializeNavigationApi] *** STARTING NAVIGATION INITIALIZATION ***"
     print "DynamicNavigationBar.brs - [initializeNavigationApi] Fetching navigation data"
     
+    ' Set default navigation immediately to prevent app crash
+    print "DynamicNavigationBar.brs - [initializeNavigationApi] *** SETTING DEFAULT NAVIGATION IMMEDIATELY ***"
+    useDefaultNavigation()
+    print "DynamicNavigationBar.brs - [initializeNavigationApi] *** DEFAULT NAVIGATION SET - navigationData count: " + m.top.navigationData.Count().ToStr() + " ***"
+    
+    ' Then try to load real data from API (will override defaults if successful)
+    print "DynamicNavigationBar.brs - [initializeNavigationApi] Creating NavigationApi Task..."
     m.navigationApi = createObject("roSGNode", "NavigationApi")
     m.navigationApi.observeField("responseData", "handleNavigationResponse")
     m.navigationApi.observeField("errorMessage", "handleNavigationError")
     m.navigationApi.control = "RUN"
+    print "DynamicNavigationBar.brs - [initializeNavigationApi] NavigationApi Task started"
 end sub
 
 sub handleNavigationResponse()
@@ -67,8 +77,15 @@ sub handleNavigationResponse()
             print "DynamicNavigationBar.brs - [handleNavigationResponse] *** RETURNED FROM injectTVGuideTabIfAuthenticated ***"
             print "DynamicNavigationBar.brs - [handleNavigationResponse] navData count after injection: " + navData.Count().ToStr()
             
+            ' Real API data arrived - clear the awaiting flag
+            m.awaitingApiResponse = false
+            
             m.top.navigationData = navData
             print "DynamicNavigationBar.brs - [handleNavigationResponse] Set navigationData field with " + navData.Count().ToStr() + " items, should trigger observer"
+            
+            ' NOTE: Global loader is managed by HomeScene.brs in onNavigationDataReceived()
+            ' It will be hidden after ALL screens are created and initial content is loaded
+            ' Do NOT hide it here as navigation data arrives before content screens load
         else
             print "DynamicNavigationBar.brs - [handleNavigationResponse] ERROR: Invalid navigation data structure, parsedData: " + FormatJson(parsedData)
             ' Only use defaults if we truly can't parse the response
@@ -271,45 +288,100 @@ sub handleNavigationError()
     if m.navigationApi.errorMessage <> invalid and m.navigationApi.errorMessage <> ""
         useDefaultNavigation()
     end if
+    
+    ' Clear awaiting flag on error
+    m.awaitingApiResponse = false
+    ' NOTE: Global loader is managed by HomeScene.brs in onNavigationDataReceived()
+    ' Even on error, default navigation will be used and loader will be hidden there
 end sub
 
 
 sub useDefaultNavigation()
-    print "DynamicNavigationBar.brs - [useDefaultNavigation] Using default navigation items"
-    
+    print "DynamicNavigationBar.brs - [useDefaultNavigation] *** USING DEFAULT NAVIGATION ITEMS ***"
+    print "DynamicNavigationBar.brs - [useDefaultNavigation] Creating default nav data array..."
+
     defaultNavData = [
         {
-            "id": 1,
+            "id": 13,
             "title": "Home",
             "images": {
                 "full_hd_images": ["pkg:/images/png/navigation_icons/home_icon.png"]
             }
         },
         {
-            "id": 2,
+            "id": 3,
             "title": "Live",
             "images": {
                 "full_hd_images": ["pkg:/images/png/navigation_icons/live_icon.png"]
             }
         },
         {
-            "id": 3,
+            "id": 17,
+            "title": "TV Guide",
+            "type": "tvguide",
+            "images": invalid
+        },
+        {
+            "id": 1,
             "title": "Movies",
             "images": {
                 "full_hd_images": ["pkg:/images/png/navigation_icons/movie_icon.png"]
             }
         },
         {
-            "id": 4,
+            "id": 2,
             "title": "TV Shows",
             "images": {
                 "full_hd_images": ["pkg:/images/png/navigation_icons/archives_icon.png"]
             }
         }
     ]
-    
+
+    print "DynamicNavigationBar.brs - [useDefaultNavigation] Setting navigationData with " + defaultNavData.Count().ToStr() + " items"
     m.top.navigationData = defaultNavData
+    print "DynamicNavigationBar.brs - [useDefaultNavigation] *** DEFAULT NAVIGATION SET SUCCESSFULLY ***"
 end sub
+
+function filterNavByAuth(navData as object) as object
+    ' Filter out authenticated-only tabs (User Channels=14, Age Restricted=15, Personal=16)
+    ' if the user is not authenticated
+    print "DynamicNavigationBar.brs - [filterNavByAuth] Checking auth status..."
+    
+    isAuthenticated = false
+    authData = RetrieveAuthDataForTVGuide()
+    if authData <> invalid and authData.accessToken <> invalid and authData.accessToken <> ""
+        if authData.isauth <> invalid and authData.isauth = 1
+            isAuthenticated = true
+        end if
+    end if
+    print "DynamicNavigationBar.brs - [filterNavByAuth] User authenticated: " + isAuthenticated.ToStr()
+    
+    if isAuthenticated
+        print "DynamicNavigationBar.brs - [filterNavByAuth] Authenticated - keeping all items"
+        return navData
+    end if
+    
+    ' Not authenticated - filter out auth-only tabs
+    filtered = []
+    for each item in navData
+        if item <> invalid and item.id <> invalid
+            itemId = item.id
+            if Type(itemId) = "roString" or Type(itemId) = "String"
+                itemId = Val(itemId)
+            end if
+            if itemId = 14 or itemId = 15 or itemId = 16
+                print "DynamicNavigationBar.brs - [filterNavByAuth] Removing '" + item.title + "' (ID " + item.id.ToStr() + ") - requires auth"
+            else
+                filtered.Push(item)
+            end if
+        else
+            filtered.Push(item)
+        end if
+    end for
+    
+    print "DynamicNavigationBar.brs - [filterNavByAuth] Filtered: " + filtered.Count().ToStr() + " items (was " + navData.Count().ToStr() + ")"
+    return filtered
+end function
 
 function buildNavigationItems() as boolean
     print "DynamicNavigationBar.brs - [buildNavigationItems] ################################################"
@@ -322,26 +394,29 @@ function buildNavigationItems() as boolean
         return false
     end if
     
-    print "DynamicNavigationBar.brs - [buildNavigationItems] Received " + navigationData.Count().ToStr() + " navigation items"
-    print "DynamicNavigationBar.brs - [buildNavigationItems] Listing all items:"
-    for i = 0 to navigationData.Count() - 1
-        if navigationData[i] <> invalid
+    print "DynamicNavigationBar.brs - [buildNavigationItems] Received " + navigationData.Count().ToStr() + " navigation items (before auth filter)"
+    
+    ' CRITICAL: Filter out authenticated-only tabs if user is not authenticated
+    ' This keeps the navigation bar tabs in sync with the content screens
+    filteredNavData = filterNavByAuth(navigationData)
+    print "DynamicNavigationBar.brs - [buildNavigationItems] After auth filter: " + filteredNavData.Count().ToStr() + " items"
+    
+    print "DynamicNavigationBar.brs - [buildNavigationItems] Listing filtered items:"
+    for i = 0 to filteredNavData.Count() - 1
+        if filteredNavData[i] <> invalid
             itemTitle = "N/A"
             itemId = "N/A"
-            if navigationData[i].title <> invalid then itemTitle = navigationData[i].title
-            if navigationData[i].id <> invalid then itemId = navigationData[i].id.ToStr()
+            if filteredNavData[i].title <> invalid then itemTitle = filteredNavData[i].title
+            if filteredNavData[i].id <> invalid then itemId = filteredNavData[i].id.ToStr()
             print "DynamicNavigationBar.brs - [buildNavigationItems]   [" + i.ToStr() + "] id=" + itemId + ", title=" + itemTitle
         end if
     end for
     
+    ' Use filtered data from here on
+    navigationData = filteredNavData
+    
     ' Clear existing dynamic items (including loading state)
     clearDynamicNavItems()
-    
-    ' Hide global loader
-    parentScene = m.top.getParent()
-    if parentScene <> invalid
-        parentScene.callFunc("hideGlobalLoader")
-    end if
     
     ' Ensure navigation bar is visible after build
     m.top.visible = true
@@ -354,7 +429,7 @@ function buildNavigationItems() as boolean
     for i = 0 to navigationData.Count() - 1
         navItem = navigationData[i]
         if navItem <> invalid
-            createDynamicNavItem(navItem, startY + (i * itemSpacing), i) ' Direct index mapping since search is removed
+            createDynamicNavItem(navItem, startY + (i * itemSpacing), i)
         end if
     end for
     
@@ -422,6 +497,33 @@ function buildNavigationItems() as boolean
     end if
     
     print "DynamicNavigationBar.brs - [buildNavigationItems] Built " + m.navItems.Count().ToStr() + " navigation items"
+    
+    ' CRITICAL: Trigger content screens rebuild AFTER navigation is fully built
+    ' This ensures screens match the new navigation structure
+    parentScene = m.top.getParent()
+    if parentScene <> invalid
+        print "DynamicNavigationBar.brs - [buildNavigationItems] *** TRIGGERING CONTENT SCREENS REBUILD ***"
+        print "DynamicNavigationBar.brs - [buildNavigationItems] Passing navigationData with " + navigationData.Count().ToStr() + " items to rebuildContentScreens"
+        print "DynamicNavigationBar.brs - [buildNavigationItems] Navigation items being passed:"
+        for i = 0 to navigationData.Count() - 1
+            if navigationData[i] <> invalid
+                itemTitle = "N/A"
+                itemId = "N/A"
+                if navigationData[i].title <> invalid then itemTitle = navigationData[i].title
+                if navigationData[i].id <> invalid then itemId = navigationData[i].id.ToStr()
+                print "DynamicNavigationBar.brs - [buildNavigationItems]   [" + i.ToStr() + "] id=" + itemId + ", title=" + itemTitle
+            end if
+        end for
+        
+        ' Call rebuildContentScreens
+        result = parentScene.callFunc("rebuildContentScreens", navigationData)
+        print "DynamicNavigationBar.brs - [buildNavigationItems] rebuildContentScreens completed, result: " + result.ToStr()
+        
+        ' NOTE: Global loader is managed by HomeScene.brs in onNavigationDataReceived()
+        ' It will be hidden after ALL screens are created and initial content is loaded
+        ' Do NOT hide it here as content screens still need to load their data
+    end if
+    
     return true
 end function
 
@@ -1187,6 +1289,18 @@ function reloadNavigation() as boolean
     if parentScene <> invalid
         parentScene.callFunc("showGlobalLoader", "Reloading App...")
     end if
+    
+    ' CRITICAL: Re-observe navigationData field to ensure buildNavigationItems is triggered
+    ' The field was unobserved during initial load by forceNavigationRebuild()
+    ' We need to re-enable it for reload to work properly
+    print "DynamicNavigationBar.brs - [reloadNavigation] Re-observing navigationData field with buildNavigationItems callback"
+    m.top.unobserveField("navigationData")
+    m.top.observeField("navigationData", "buildNavigationItems")
+    print "DynamicNavigationBar.brs - [reloadNavigation] navigationData field re-observed"
+    
+    ' Mark that we're waiting for the real API response
+    ' The loader should stay visible until the API data arrives
+    m.awaitingApiResponse = true
     
     ' Re-initialize navigation API to fetch fresh data
     print "DynamicNavigationBar.brs - [reloadNavigation] Re-fetching navigation data from API"

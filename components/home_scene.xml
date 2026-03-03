@@ -15,6 +15,9 @@
     <function name="showNavigationAndHomeScreen" />
     <function name="expandContent" />
     <function name="collapseContent" />
+    <function name="rebuildContentScreens" />
+    <function name="showGlobalLoader" />
+    <function name="hideGlobalLoader" />
   </interface>
   <children>
     <!-- Content Expand/Collapse Animations -->
@@ -125,9 +128,7 @@
     id="SeasonScreen" translation="[0, 0]" visible="false"
     ></SeasonScreen>
     
-    <M3UChannelScreen
-    id="m3uChannelScreen" translation="[0, 0]" visible="false"
-    ></M3UChannelScreen>
+    <!-- M3UChannelScreen will be created dynamically when user clicks on M3U item -->
     
     <SplashPage id="splashPage" translation="[0,0]" visible = "true"/>
     

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="M3UPlaylistCard" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet"/>
+        <field id="focusPercent" type="float" onChange="showFocus"/>
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/widgets/M3UPlaylistCard.brs"/>
+
+    <children>
+        <!-- Main Container -->
+        <Group id="itemContainer" translation="[0, 0]">
+            
+            <!-- Background Card (Landscape 16:9) -->
+            <Rectangle
+                id="cardBackground"
+                width="350"
+                height="197"
+                color="0x2A3F5EFF"
+                translation="[0, 0]"/>
+            
+            <!-- Logo/Icon (centered, large) -->
+            <Poster
+                id="logoImage"
+                uri="pkg:/images/png/gia-tv-logo.png"
+                width="150"
+                height="150"
+                translation="[100, 23]"
+                loadDisplayMode="scaleToFit"
+                failedBitmapUri="pkg:/images/png/gia-tv-logo.png"/>
+            
+            <!-- Text Section at Bottom -->
+            <Rectangle
+                id="textBackground"
+                width="350"
+                height="70"
+                color="0x0F1419FF"
+                translation="[0, 127]"/>
+            
+            <!-- Title Label -->
+            <Label
+                id="titleLabel"
+                text="Samsung USA Channels"
+                width="330"
+                height="30"
+                translation="[10, 135]"
+                color="0xFFFFFFFF"
+                horizAlign="center"
+                vertAlign="top"
+                font="font:MediumBoldSystemFont"/>
+            
+            <!-- Description Label -->
+            <Label
+                id="descriptionLabel"
+                text="200+ Free Live TV Channels"
+                width="330"
+                height="25"
+                translation="[10, 165]"
+                color="0xE5E5E5FF"
+                horizAlign="center"
+                vertAlign="top"
+                font="font:SmallSystemFont"/>
+            
+            <!-- Focus Border -->
+            <Rectangle
+                id="focusBorder"
+                width="350"
+                height="197"
+                color="0x00000000"
+                translation="[0, 0]"
+                opacity="0"/>
+        </Group>
+        
+        <!-- Title Below Card (like SeriesItemComponent) -->
+        <Label
+            id="bottomTitle"
+            text="Samsung USA Channels"
+            width="350"
+            height="40"
+            translation="[0, 203]"
+            horizAlign="left"
+            vertAlign="top"
+            color="0xCCCCCCFF"
+            font="font:TinyBoldSystemFont"
+            maxLines="2"
+            ellipsisText="..."/>
+    </children>
+</component>

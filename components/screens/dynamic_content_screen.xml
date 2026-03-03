@@ -130,6 +130,84 @@
       width="1740"
       height="1000" />
     
+    <!-- Dedicated RowList for Personal page (M3U items) -->
+    <RowList
+      id="personalRowList"
+      translation="[20, 20]"
+      visible="false"
+      itemComponentName="DVRItemComponent"
+      itemSpacing="[0, 40]"
+      rowItemSpacing="[30, 15]"
+      rowLabelOffset="[0, 15]"
+      showRowLabel="true"
+      showRowCounter="false"
+      numRows="10"
+      rowFocusAnimationStyle="fixedFocus"
+      rowItemSize="[400, 300]"
+      rowHeights="[320]"
+      width="1740"
+      height="1000" />
+    
+    <!-- Static Personal Page Content (Hardcoded M3U Item) -->
+    <Group id="personalStaticGroup" translation="[20, 150]" visible="false">
+      <!-- Row Label -->
+      <Label
+        id="personalRowLabel"
+        text="Shared Channels"
+        color="#ffffff"
+        font="font:UrbanistBold"
+        horizAlign="left"
+        vertAlign="top"
+        translation="[0, 0]"
+        width="400"
+        height="40">
+        <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28" />
+      </Label>
+      
+      <!-- M3U Playlist Card (Hardcoded) -->
+      <Group id="m3uCardGroup" translation="[0, 60]" focusable="true">
+        <!-- Card Background -->
+        <Rectangle
+          id="m3uCardBackground"
+          width="350"
+          height="197"
+          color="0x2A3F5EFF"/>
+        
+        <!-- Logo (Centered) -->
+        <Poster
+          id="m3uLogo"
+          uri="pkg:/images/png/gia-tv-logo.png"
+          width="150"
+          height="150"
+          translation="[100, 23]"
+          loadDisplayMode="scaleToFit"
+          failedBitmapUri="pkg:/images/png/gia-tv-logo.png"/>
+        
+        <!-- Focus Indicator (Standard outline) -->
+        <Rectangle
+          id="m3uFocusIndicator"
+          width="350"
+          height="197"
+          color="#f16667"
+          translation="[0, 0]"
+          opacity="0"/>
+        
+        <!-- Title Below Card (Only title shown) -->
+        <Label
+          id="m3uBottomTitle"
+          text="M3U Channels"
+          width="350"
+          height="40"
+          translation="[0, 203]"
+          color="0xCCCCCCFF"
+          font="font:TinyBoldSystemFont"
+          horizAlign="left"
+          vertAlign="top"
+          maxLines="2"
+          ellipsisText="..."/>
+      </Group>
+    </Group>
+    
     <!-- No content message -->
     <Group id="noContentGroup" translation="[0, 0]" visible="false">
       <!-- GIA.TV Logo -->

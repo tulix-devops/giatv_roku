@@ -1,9 +1,0 @@
-title=GiaTV
-major_version=1
-minor_version=6
-build_version=00003
-splash_rsg_optimization=1
-mm_icon_focus_hd=pkg:/images/png/gia-tv-big.png
-mm_icon_focus_sd=pkg:/images/png/gia-tv-big.png
-supports_input_launch=1
-ui_resolutions=fhd

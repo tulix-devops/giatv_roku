@@ -75,6 +75,9 @@ function init()
     ' Flag to prevent navigation index changes during initial load
     m.isInitialLoad = true
     
+    ' Guard to prevent showNavigationAndHomeScreen from running more than once
+    m.navigationAndHomeScreenShown = false
+    
     ' Navigation mapping for dynamic items
     m.navigationMapping = {}
     
@@ -99,6 +102,11 @@ end sub
 
 
 sub showNavigationAndHomeScreen()
+    if m.navigationAndHomeScreenShown = true
+        print "HomeScene.brs - [showNavigationAndHomeScreen] Already shown, skipping duplicate call"
+        return
+    end if
+    m.navigationAndHomeScreenShown = true
     print "HomeScene.brs - [showNavigationAndHomeScreen] Showing navigation and home screen"
     
     ' Show home banner initially (since we start on Home screen)
@@ -580,9 +588,12 @@ function getScreenByIndex(index as integer) as object
     
     ' Check if this is the Account screen (last index)
     ' Account should be a hardcoded screen, not dynamic content
+    ' Profile is always at navigationData.Count() (after all API items)
+    accountIndex = getAccountScreenIndex()
     print "HomeScene.brs - [getScreenByIndex] Checking if index " + index.ToStr() + " is Account screen"
     print "HomeScene.brs - [getScreenByIndex] Dynamic screens count: " + m.dynamicContentScreens.Count().ToStr()
-    if index >= m.dynamicContentScreens.Count()
+    print "HomeScene.brs - [getScreenByIndex] Calculated Account index: " + accountIndex.ToStr()
+    if index = accountIndex
         print "HomeScene.brs - [getScreenByIndex] *** INDEX " + index.ToStr() + " IS ACCOUNT SCREEN ***"
         print "HomeScene.brs - [getScreenByIndex] Dynamic screens count: " + m.dynamicContentScreens.Count().ToStr()
         print "HomeScene.brs - [getScreenByIndex] Requested index: " + index.ToStr()
@@ -814,6 +825,15 @@ end sub
 sub onNavigationDataReceived()
     print "HomeScene.brs - [onNavigationDataReceived] Navigation data received, creating dynamic screens"
     print "HomeScene.brs - [onNavigationDataReceived] Function called successfully"
+    ' print "HomeScene.brs - [onNavigationDataReceived] m.isReloading = " + m.isReloading.ToStr()
+    ' print "HomeScene.brs - [onNavigationDataReceived] m.isInitialLoad = " + m.isInitialLoad.ToStr()
+    
+    ' CRITICAL: Only run this during INITIAL app load
+    ' During reload, buildNavigationItems (triggered by observer) calls rebuildContentScreens directly
+    if m.isInitialLoad = false
+        print "HomeScene.brs - [onNavigationDataReceived] *** SKIPPING - Not initial load, screens handled by rebuildContentScreens ***"
+        return
+    end if
     
     ' Get navigation data from the active navigation bar
     navigationData = invalid
@@ -843,49 +863,27 @@ sub onNavigationDataReceived()
         
         m.navigationItems = filteredNavigationData
         
-        ' CRITICAL: Force rebuild of navigation bar with filtered data
-        ' We need to manually call buildNavigationItems since we're modifying the data after it was set
-        forceNavigationRebuild(filteredNavigationData)
-        
-        createDynamicContentScreens()
-        
-        ' Show first content screen by default but keep focus on navigation
-        print "HomeScene.brs - [onNavigationDataReceived] Auto-showing first screen (index 0) without focusing content"
-        print "HomeScene.brs - [onNavigationDataReceived] Available screens: " + FormatJson(m.dynamicContentScreens.Keys())
-        print "HomeScene.brs - [onNavigationDataReceived] All screens should have loaded their content by now"
-        
-        print "HomeScene.brs - [onNavigationDataReceived] Auto-showing first screen (index 0) without focusing content"
-        print "HomeScene.brs - [onNavigationDataReceived] Available screens: " + FormatJson(m.dynamicContentScreens.Keys())
-        print "HomeScene.brs - [onNavigationDataReceived] All screens should have loaded their content by now"
-        
-        ' Add a fallback timer to hide loader if content doesn't load
-        if m.loaderFallbackTimer <> invalid
-            m.loaderFallbackTimer.control = "stop"
+        if m.isInitialLoad = true
+            print "HomeScene.brs - [onNavigationDataReceived] Initial load - rebuilding nav bar and creating screens"
+            forceNavigationRebuild(filteredNavigationData)
+        else
+            print "HomeScene.brs - [onNavigationDataReceived] Not initial load - skipping forceNavigationRebuild"
         end if
-        m.loaderFallbackTimer = CreateObject("roSGNode", "Timer")
-        m.loaderFallbackTimer.duration = 5.0  ' 5 second fallback
-        m.loaderFallbackTimer.repeat = false
-        m.loaderFallbackTimer.observeField("fire", "onLoaderFallbackTimeout")
-        m.loaderFallbackTimer.control = "start"
-        print "HomeScene.brs - [onNavigationDataReceived] Started 5-second fallback timer"
         
-        ' Ensure current screen index is properly initialized
+        print "HomeScene.brs - [onNavigationDataReceived] Available screens: " + FormatJson(m.dynamicContentScreens.Keys())
+        
         m.currentScreenIndex = 0
-        print "HomeScene.brs - [onNavigationDataReceived] Setting initial currentScreenIndex to: " + m.currentScreenIndex.ToStr()
         
-        ' CRITICAL: Ensure navigation bar is set to Home before switching content
         if m.dynamicNavBar <> invalid
-            print "HomeScene.brs - [onNavigationDataReceived] *** FORCING NAVIGATION TO HOME BEFORE CONTENT SWITCH ***"
-            
             m.dynamicNavBar.selectedIndex = 0
-            print "HomeScene.brs - [onNavigationDataReceived] *** FORCED NAVIGATION selectedIndex TO 0 ***"
         end if
         
         switchScreenContent(0)
         
-        ' Mark initial load as complete after first screen is shown
         m.isInitialLoad = false
-        print "HomeScene.brs - [onNavigationDataReceived] Initial load complete, navigation index changes now allowed"
+        print "HomeScene.brs - [onNavigationDataReceived] Initial load complete"
+        
+        hideGlobalLoader()
     else
         print "HomeScene.brs - [onNavigationDataReceived] No navigation data available"
     end if
@@ -1232,7 +1230,8 @@ function getExpectedTitleForContentTypeId(contentTypeId as integer) as string
 end function
 
 function checkAuthenticationForUserChannels() as boolean
-    ' Check if user is authenticated for User Channels access
+    ' Check if user is authenticated for accessing authenticated-only tabs
+    ' (User Channels, Age Restricted, Personal)
     authData = RetrieveAuthData()
     if authData <> invalid and authData.isauth = 1
         print "HomeScene.brs - [checkAuthenticationForUserChannels] User is authenticated"
@@ -1245,7 +1244,7 @@ end function
 
 function filterNavigationByAuth(navigationData as object) as object
     ' Filter navigation items based on authentication status
-    ' Remove User Channels (ID 14) if user is not authenticated
+    ' Remove User Channels (ID 14), Age Restricted (ID 15), and Personal (ID 16) if user is not authenticated
     print "HomeScene.brs - [filterNavigationByAuth] ========== FILTERING NAVIGATION =========="
     print "HomeScene.brs - [filterNavigationByAuth] Input items: " + navigationData.Count().ToStr()
     
@@ -1260,17 +1259,18 @@ function filterNavigationByAuth(navigationData as object) as object
             itemTitle = ""
             if navItem.title <> invalid then itemTitle = navItem.title
             
-            ' Check if this is User Channels (ID 14)
-            if itemId = 14
+            ' Check if this is an authenticated-only tab
+            ' User Channels (ID 14), Age Restricted (ID 15), Personal (ID 16)
+            if itemId = 14 or itemId = 15 or itemId = 16
                 if isAuthenticated
-                    print "HomeScene.brs - [filterNavigationByAuth] ✓ User Channels (ID 14) - KEEPING (user authenticated)"
+                    print "HomeScene.brs - [filterNavigationByAuth] ✓ '" + itemTitle + "' (ID " + itemId.ToStr() + ") - KEEPING (user authenticated)"
                     filteredItems.Push(navItem)
                 else
-                    print "HomeScene.brs - [filterNavigationByAuth] ✗ User Channels (ID 14) - REMOVING (user not authenticated)"
+                    print "HomeScene.brs - [filterNavigationByAuth] ✗ '" + itemTitle + "' (ID " + itemId.ToStr() + ") - REMOVING (user not authenticated)"
                     ' DO NOT add to filteredItems
                 end if
             else
-                ' Keep all other items
+                ' Keep all other items (Home, Live TV, TV Guide, Movies, Series)
                 print "HomeScene.brs - [filterNavigationByAuth] ✓ '" + itemTitle + "' (ID " + itemId.ToStr() + ") - KEEPING"
                 filteredItems.Push(navItem)
             end if
@@ -1676,6 +1676,13 @@ sub hideGlobalLoader()
         m.loaderFallbackTimer = invalid
         print "HomeScene.brs - [hideGlobalLoader] Stopped fallback timer"
     end if
+    
+    ' Stop reload safety timer if it's running
+    if m.reloadSafetyTimer <> invalid
+        m.reloadSafetyTimer.control = "stop"
+        m.reloadSafetyTimer = invalid
+        print "HomeScene.brs - [hideGlobalLoader] Stopped reload safety timer"
+    end if
 end sub
 
 sub onLoaderFallbackTimeout()
@@ -1686,6 +1693,19 @@ sub onLoaderFallbackTimeout()
         stopLoadingAnimation()
     end if
     m.loaderFallbackTimer = invalid
+end sub
+
+sub onReloadSafetyTimeout()
+    print "HomeScene.brs - [onReloadSafetyTimeout] *** RELOAD SAFETY TIMEOUT *** Forcing loader to hide after reload"
+    if m.globalLoader <> invalid and m.globalLoader.visible = true
+        print "HomeScene.brs - [onReloadSafetyTimeout] Loader still visible after 10 seconds, forcing hide"
+        m.globalLoader.visible = false
+        stopLoadingAnimation()
+        print "HomeScene.brs - [onReloadSafetyTimeout] Loader forcefully hidden"
+    else
+        print "HomeScene.brs - [onReloadSafetyTimeout] Loader already hidden, no action needed"
+    end if
+    m.reloadSafetyTimer = invalid
 end sub
 
 sub startLoadingAnimation()
@@ -2460,8 +2480,24 @@ function reloadAppData() as boolean
     ' Show global loading screen
     showGlobalLoader("Reloading App...")
     
-    ' Reset initial load flag so the app behaves like fresh start
-    m.isInitialLoad = true
+    ' Add safety timer to ensure loader is hidden even if something fails
+    if m.reloadSafetyTimer <> invalid
+        m.reloadSafetyTimer.control = "stop"
+    end if
+    m.reloadSafetyTimer = CreateObject("roSGNode", "Timer")
+    m.reloadSafetyTimer.duration = 10.0  ' 10 second safety timeout
+    m.reloadSafetyTimer.repeat = false
+    m.reloadSafetyTimer.observeField("fire", "onReloadSafetyTimeout")
+    m.reloadSafetyTimer.control = "start"
+    print "HomeScene.brs - [reloadAppData] Started 10-second safety timer to ensure loader is hidden"
+    
+    ' IMPORTANT: Do NOT set m.isInitialLoad = true during reload
+    ' This would cause onNavigationDataReceived to unobserve the navigationData field
+    ' which would break the reload flow
+    print "HomeScene.brs - [reloadAppData] Keeping m.isInitialLoad = false to prevent observer issues"
+    
+    ' Set flag to indicate we're in reload mode (prevents double screen rebuild)
+    m.isReloading = true
     
     ' Clear all dynamic content screens
     print "HomeScene.brs - [reloadAppData] Clearing all dynamic content screens..."
@@ -2479,16 +2515,32 @@ function reloadAppData() as boolean
         m.dynamicContentScreens.Clear()
     end if
     
+    ' Check current auth status from registry
+    sec = CreateObject("roRegistrySection", "AUTH")
+    authDataStr = sec.Read("authData")
+    isAuthenticated = false
+    if authDataStr <> invalid and authDataStr <> ""
+        authData = ParseJson(authDataStr)
+        if authData <> invalid and authData.accessToken <> invalid and authData.accessToken <> ""
+            isAuthenticated = true
+        end if
+    end if
+    print "HomeScene.brs - [reloadAppData] Current auth status: " + isAuthenticated.ToStr()
+    
     ' Reset Account screen if it exists
     accountScreen = m.top.findNode("account_screen")
     if accountScreen <> invalid
         print "HomeScene.brs - [reloadAppData] Updating Account screen status"
         accountScreen.visible = false
-        accountScreen.accountStatus = true ' User is now logged in
+        accountScreen.accountStatus = isAuthenticated
         
-        ' Trigger user data reload on Account screen
-        print "HomeScene.brs - [reloadAppData] Triggering Account screen to reload user data"
-        accountScreen.callFunc("refreshUserData")
+        ' Only trigger user data reload if authenticated
+        if isAuthenticated
+            print "HomeScene.brs - [reloadAppData] User authenticated - triggering Account screen to reload user data"
+            accountScreen.callFunc("refreshUserData")
+        else
+            print "HomeScene.brs - [reloadAppData] User not authenticated - skipping user data reload"
+        end if
     else
         print "HomeScene.brs - [reloadAppData] WARNING: Account screen not found"
     end if
@@ -2525,6 +2577,162 @@ function reloadAppData() as boolean
     else
         print "HomeScene.brs - [reloadAppData] ERROR: No active navigation bar found"
         hideGlobalLoader()
+    end if
+    
+    return true
+end function
+
+' Rebuild content screens when navigation data changes (e.g., after login)
+function rebuildContentScreens(navigationData as object) as boolean
+    print "HomeScene.brs - [rebuildContentScreens] *** REBUILDING CONTENT SCREENS ***"
+    print "HomeScene.brs - [rebuildContentScreens] Navigation items count (before filtering): " + navigationData.Count().ToStr()
+    
+    ' CRITICAL: Filter navigation items based on authentication
+    ' This ensures User Channels (ID 14) is only shown when authenticated
+    filteredNavigationData = filterNavigationByAuth(navigationData)
+    print "HomeScene.brs - [rebuildContentScreens] Filtered navigation items count: " + filteredNavigationData.Count().ToStr()
+    
+    ' Check if filtered data is empty
+    if filteredNavigationData.Count() = 0
+        print "HomeScene.brs - [rebuildContentScreens] ERROR: Filtered navigation data is empty! Cannot create screens."
+        print "HomeScene.brs - [rebuildContentScreens] Original navigation data count: " + navigationData.Count().ToStr()
+        ' Use unfiltered data as fallback to prevent empty screens
+        filteredNavigationData = navigationData
+        print "HomeScene.brs - [rebuildContentScreens] Using unfiltered data as fallback"
+    end if
+    
+    ' CRITICAL: Update m.navigationItems so getAccountScreenIndex() calculates correctly
+    m.navigationItems = filteredNavigationData
+    print "HomeScene.brs - [rebuildContentScreens] Updated m.navigationItems with " + filteredNavigationData.Count().ToStr() + " items"
+    
+    ' Verify container exists
+    if m.dynamicScreensContainer = invalid
+        print "HomeScene.brs - [rebuildContentScreens] ERROR: dynamicScreensContainer is invalid! Cannot rebuild screens."
+        return false
+    end if
+    print "HomeScene.brs - [rebuildContentScreens] dynamicScreensContainer verified, current children: " + m.dynamicScreensContainer.getChildCount().ToStr()
+    
+    ' Check if we're in reload mode (screens already cleared by reloadAppData)
+    if m.isReloading = true
+        print "HomeScene.brs - [rebuildContentScreens] In reload mode - screens already cleared by reloadAppData"
+    else
+        ' Clear existing dynamic content screens
+        if m.dynamicContentScreens <> invalid
+            print "HomeScene.brs - [rebuildContentScreens] Clearing " + m.dynamicContentScreens.Count().ToStr() + " existing screens"
+            for each key in m.dynamicContentScreens.Keys()
+                screenInfo = m.dynamicContentScreens[key]
+                if screenInfo <> invalid and screenInfo.screen <> invalid
+                    print "HomeScene.brs - [rebuildContentScreens] Removing screen at index: " + key
+                    screenInfo.screen.visible = false
+                    if m.dynamicScreensContainer <> invalid
+                        m.dynamicScreensContainer.removeChild(screenInfo.screen)
+                    end if
+                end if
+            end for
+            m.dynamicContentScreens.Clear()
+        else
+            m.dynamicContentScreens = {}
+        end if
+    end if
+    
+    ' Ensure dynamicContentScreens is initialized
+    if m.dynamicContentScreens = invalid
+        m.dynamicContentScreens = {}
+    end if
+    print "HomeScene.brs - [rebuildContentScreens] dynamicContentScreens cleared and ready"
+    
+    ' Recreate screens based on filtered navigation data
+    print "HomeScene.brs - [rebuildContentScreens] =========================================="
+    print "HomeScene.brs - [rebuildContentScreens] Creating screens for " + filteredNavigationData.Count().ToStr() + " navigation items"
+    print "HomeScene.brs - [rebuildContentScreens] =========================================="
+    
+    for i = 0 to filteredNavigationData.Count() - 1
+        navItem = filteredNavigationData[i]
+        if navItem <> invalid
+            print "HomeScene.brs - [rebuildContentScreens] ----------------------------------------"
+            print "HomeScene.brs - [rebuildContentScreens] Creating screen " + i.ToStr() + " for: " + navItem.title
+            print "HomeScene.brs - [rebuildContentScreens] NavItem ID: " + navItem.id.ToStr()
+            
+            ' Determine if this is TV Guide
+            isTVGuide = (navItem.id <> invalid and navItem.id = 17)
+            
+            ' Create appropriate screen type
+            contentScreen = invalid
+            if isTVGuide
+                contentScreen = CreateObject("roSGNode", "TVGuideScreen")
+                print "HomeScene.brs - [rebuildContentScreens] Created TVGuideScreen"
+            else
+                contentScreen = CreateObject("roSGNode", "dynamic_content_screen")
+                print "HomeScene.brs - [rebuildContentScreens] Created dynamic_content_screen"
+            end if
+            
+            if contentScreen <> invalid
+                ' CRITICAL: Use mapNavItemToContentTypeId to get proper contentTypeId
+                mappedContentTypeId = mapNavItemToContentTypeId(navItem, i)
+                contentScreen.contentTypeId = mappedContentTypeId
+                print "HomeScene.brs - [rebuildContentScreens] ✓ navItem.id=" + navItem.id.ToStr() + " -> contentTypeId=" + mappedContentTypeId.ToStr() + " for '" + navItem.title + "'"
+                
+                contentScreen.id = "content_screen_" + i.ToStr()
+                contentScreen.translation = [0, 0]
+                contentScreen.visible = false
+                
+                ' Add to container
+                if m.dynamicScreensContainer <> invalid
+                    m.dynamicScreensContainer.appendChild(contentScreen)
+                    print "HomeScene.brs - [rebuildContentScreens] ✓ Screen added to container"
+                else
+                    print "HomeScene.brs - [rebuildContentScreens] ERROR: dynamicScreensContainer is invalid!"
+                end if
+                
+                ' Set up event handlers
+                contentScreen.observeField("dvrRequested", "onDVRRequested")
+                contentScreen.observeField("videoPlayRequested", "onVideoPlayRequested")
+                
+                ' Store reference
+                m.dynamicContentScreens[i.ToStr()] = {
+                    screen: contentScreen,
+                    navItem: navItem
+                }
+                
+                print "HomeScene.brs - [rebuildContentScreens] ✓ Screen " + i.ToStr() + " stored: '" + navItem.title + "' with contentTypeId: " + contentScreen.contentTypeId.ToStr()
+            else
+                print "HomeScene.brs - [rebuildContentScreens] ERROR: Failed to create screen for " + navItem.title
+            end if
+        else
+            print "HomeScene.brs - [rebuildContentScreens] ERROR: navItem at index " + i.ToStr() + " is invalid"
+        end if
+    end for
+    
+    print "HomeScene.brs - [rebuildContentScreens] =========================================="
+    
+    print "HomeScene.brs - [rebuildContentScreens] *** REBUILD COMPLETE - " + m.dynamicContentScreens.Count().ToStr() + " screens created ***"
+    
+    ' Log all created screens for debugging
+    print "HomeScene.brs - [rebuildContentScreens] Final screen mapping:"
+    for each key in m.dynamicContentScreens.Keys()
+        screenInfo = m.dynamicContentScreens[key]
+        if screenInfo <> invalid and screenInfo.screen <> invalid
+            print "HomeScene.brs - [rebuildContentScreens]   Index " + key + ": " + screenInfo.navItem.title + " (contentTypeId: " + screenInfo.screen.contentTypeId.ToStr() + ")"
+        end if
+    end for
+    
+    ' Calculate and log Profile index (based on filtered data)
+    profileIndex = filteredNavigationData.Count()
+    print "HomeScene.brs - [rebuildContentScreens] Profile/Account should be at index: " + profileIndex.ToStr()
+    
+    ' Clear reload flag if it was set
+    if m.isReloading = true
+        m.isReloading = false
+        print "HomeScene.brs - [rebuildContentScreens] Cleared reload flag"
+    end if
+    
+    ' Show the Home screen (index 0) after any rebuild
+    if m.dynamicContentScreens.DoesExist("0")
+        print "HomeScene.brs - [rebuildContentScreens] *** AUTO-SHOWING HOME SCREEN ***"
+        showScreenByIndex(0)
+        print "HomeScene.brs - [rebuildContentScreens] Home screen shown"
+    else
+        print "HomeScene.brs - [rebuildContentScreens] ERROR: Home screen (index 0) not found!"
     end if
     
     return true

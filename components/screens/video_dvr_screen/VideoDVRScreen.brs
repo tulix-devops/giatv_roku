@@ -60,10 +60,58 @@ function init()
 end function
 
 sub On_dialogErrStream_buttonSelected()
-    print "HeroScene.brs - [On_dialogErrStream_buttonSelected()] Called"
+    print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Called"
+    print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] navigatedFrom: " + m.top.navigatedFrom
+    
     MainSceneNode = m.top.getScene()
     MainSceneNode.dialog.close = true
-    print "HeroScene.brs - [On_dialogErrStream_buttonSelected()] Exiting"
+    
+    ' Stop video player first
+    m.videoPlayer.control = "stop"
+    m.top.visible = false
+    
+    ' Navigate back to the source screen after error dialog is closed
+    if m.top.navigatedFrom = "M3UChannels"
+        print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Returning to M3U Channels screen"
+        
+        m3uScreen = m.global.findNode("m3uChannelScreen")
+        if m3uScreen <> invalid
+            print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Found m3uChannelScreen"
+            m3uScreen.visible = true
+            
+            ' Get the channel grid and restore focus
+            channelGrid = m3uScreen.findNode("channelGrid")
+            if channelGrid <> invalid
+                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Setting focus on channel grid"
+                channelGrid.setFocus(true)
+            else
+                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] channelGrid not found, setting focus on screen"
+                m3uScreen.setFocus(true)
+            end if
+            
+            print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Focus returned to M3U screen"
+        else
+            print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] ERROR: m3uChannelScreen not found"
+        end if
+    else if m.top.navigatedFrom = "Seasons"
+        print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Returning to Season screen"
+        
+        seasonScreen = m.global.findNode("SeasonScreen")
+        if seasonScreen <> invalid
+            seasonScreen.visible = true
+            seasonScreen.setFocus(true)
+        end if
+    else if m.top.navigatedFrom = "VOD"
+        m.global.findNode("vod_screen").setFocus(true)
+        m.global.findNode("vod_screen").visible = true
+        m.global.findNode("navigation_bar").visible = true
+    else if m.top.navigatedFrom = "LIVE"
+        m.global.findNode("live_screen").setFocus(true)
+        m.global.findNode("live_screen").visible = true
+        m.global.findNode("navigation_bar").visible = true
+    end if
+    
+    print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Exiting"
 end sub
 
 ' =============================================================================
@@ -248,6 +296,17 @@ function onKeyEvent(key as string, isPressed as boolean) as boolean
             m.global.findNode("SeasonScreen").setFocus(true)
             m.global.findNode("SeasonScreen").visible = true
             return true
+        else if m.top.navigatedFrom = "M3UChannels" then
+            m.top.visible = false
+            m.videoPlayer.control = "stop"
+            m3uScreen = m.global.findNode("m3uChannelScreen")
+            if m3uScreen <> invalid
+                m3uScreen.setFocus(true)
+                m3uScreen.visible = true
+            else
+                print "VideoDVRScreen.brs - [onKeyEvent] ERROR: m3uChannelScreen not found"
+            end if
+            return true
         end if
 
     end if
@@ -411,6 +470,17 @@ sub onVideoPlayerStateChange()
             m.videoPlayer.control = "stop"
             m.global.findNode("SeasonScreen").setFocus(true)
             m.global.findNode("SeasonScreen").visible = true
+
+        else if m.top.navigatedFrom = "M3UChannels" then
+            m.top.visible = false
+            m.videoPlayer.control = "stop"
+            m3uScreen = m.global.findNode("m3uChannelScreen")
+            if m3uScreen <> invalid
+                m3uScreen.setFocus(true)
+                m3uScreen.visible = true
+            else
+                print "VideoDVRScreen.brs - [onVideoPlayerStateChange] ERROR: m3uChannelScreen not found"
+            end if
 
         end if
 

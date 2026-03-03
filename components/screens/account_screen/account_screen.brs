@@ -288,16 +288,26 @@ function ClearAuthData()
 
     ' Clear the auth data
     sec.Delete("authData")
-    
+
     ' Clear the user data
     sec.Delete("userData")
-    
+
     sec.Flush()
-    
+
     ' Clear user profile UI
     clearUserProfile()
 
     print "Auth data and user data cleared successfully."
+    
+    ' Reload app to fetch navigation without session token
+    print "AccountScreen.brs - [ClearAuthData] *** RELOADING APP AFTER LOGOUT ***"
+    parentScene = m.top.getScene()
+    if parentScene <> invalid
+        parentScene.callFunc("reloadAppData")
+        print "AccountScreen.brs - [ClearAuthData] App reload triggered"
+    else
+        print "AccountScreen.brs - [ClearAuthData] ERROR: Could not find parent scene to reload app"
+    end if
 end function
 
 sub validateAccountStatus()

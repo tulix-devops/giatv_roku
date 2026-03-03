@@ -76,6 +76,32 @@ sub onFocusChanged()
     print "DynamicContentScreen.brs - [onFocusChanged] Loading visible: " + m.loadingGroup.visible.ToStr()
     print "DynamicContentScreen.brs - [onFocusChanged] Screen focusable: " + m.top.focusable.ToStr()
     
+    ' CRITICAL FIX: Force load Personal page content if it's empty
+    if m.top.contentTypeId = 16 and m.contentRowList.visible = true
+        ? "========== CHECKING PERSONAL PAGE CONTENT =========="
+        if m.contentRowList.content = invalid
+            ? "========== PERSONAL PAGE HAS NO CONTENT - LOADING NOW =========="
+            loadPersonalPageContent()
+        else if m.contentRowList.content.getChildCount() = 0
+            ? "========== PERSONAL PAGE HAS EMPTY CONTENT - LOADING NOW =========="
+            loadPersonalPageContent()
+        else
+            ' Check if first row has items
+            firstRow = m.contentRowList.content.getChild(0)
+            if firstRow <> invalid
+                ? "Personal page first row has "; firstRow.getChildCount(); " items"
+                if firstRow.getChildCount() > 0
+                    firstItem = firstRow.getChild(0)
+                    ? "First item title: "; firstItem.title
+                    ? "First item hdPosterUrl: "; firstItem.hdPosterUrl
+                else
+                    ? "========== PERSONAL PAGE ROW HAS NO ITEMS - LOADING NOW =========="
+                    loadPersonalPageContent()
+                end if
+            end if
+        end if
+    end if
+    
     if m.top.hasFocus()
         ' When content screen gains focus, check if we should set focus on content or return to navigation
         print "DynamicContentScreen.brs - [onFocusChanged] Screen gained focus, calling setInitialFocus"
@@ -219,9 +245,17 @@ sub onExpandedChanged()
 end sub
 
 sub loadContentForType()
+    ? "========== loadContentForType CALLED =========="
     print "DynamicContentScreen.brs - [loadContentForType] *** FUNCTION CALLED ***"
     contentTypeId = m.top.contentTypeId
+    ? "contentTypeId = "; contentTypeId
     print "DynamicContentScreen.brs - [loadContentForType] Current contentTypeId: " + contentTypeId.ToStr()
+    
+    ' Force reload for Personal page (contentTypeId = 16) even if content exists
+    if contentTypeId = 16
+        ? "========== PERSONAL PAGE 16 DETECTED =========="
+        print "DynamicContentScreen.brs - [loadContentForType] *** PERSONAL PAGE (16) - FORCE LOADING ***"
+    end if
     print "DynamicContentScreen.brs - [loadContentForType] Screen ID: " + m.top.id
     print "DynamicContentScreen.brs - [loadContentForType] Screen visible state - translation: [" + m.top.translation[0].ToStr() + ", " + m.top.translation[1].ToStr() + "]"
     print "DynamicContentScreen.brs - [loadContentForType] Current showingAuthRequired: " + m.showingAuthRequired.ToStr()
@@ -488,13 +522,8 @@ sub loadContentForType()
         return
     end if
     
-    ' Show global loading state
-    parentScene = m.top.getParent()
-    if parentScene <> invalid
-        parentScene.callFunc("showGlobalLoader", "Loading Content...")
-    end if
-    
-    ' Show loading state
+    ' Show per-screen loading state (do NOT show global loader here -
+    ' global loader is managed at app level during init/reload only)
     showLoadingState()
     
     ' Initialize content API
@@ -514,56 +543,98 @@ sub loadContentForType()
 end sub
 
 sub loadPersonalPageContent()
-    print "DynamicContentScreen.brs - [loadPersonalPageContent] *** Loading hardcoded M3U content for Personal page ***"
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] *** Loading STATIC M3U content for Personal page ***"
     
-    ' Create content node with hardcoded M3U item
-    contentNode = CreateObject("roSGNode", "ContentNode")
-    
-    ' Create a single row for "Shared Channels"
-    rowNode = contentNode.createChild("ContentNode")
-    rowNode.title = "Shared Channels"
-    
-    ' Create M3U playlist item
-    m3uItem = rowNode.createChild("ContentNode")
-    m3uItem.title = "Samsung USA Channels"
-    m3uItem.description = "Live TV channels from Samsung TV Plus"
-    m3uItem.HDPosterUrl = "pkg:/images/background.png"
-    m3uItem.FHDPosterUrl = "pkg:/images/background.png"
-    
-    ' Store M3U URL in a custom field
-    m3uItem.m3uUrl = "https://apsattv.com/ssungusa.m3u"
-    m3uItem.contentType = "m3u_playlist"
-    m3uItem.typeId = 99 ' Custom type ID for M3U playlists
-    
-    print "DynamicContentScreen.brs - [loadPersonalPageContent] Created M3U item with URL: " + m3uItem.m3uUrl
-    
-    ' Set content to RowList
-    m.contentRowList.content = contentNode
-    m.contentRowList.visible = true
+    ' Hide RowList and show static group
+    m.contentRowList.visible = false
     m.noContentGroup.visible = false
+    
+    ' Get static personal group
+    personalStaticGroup = m.top.findNode("personalStaticGroup")
+    m3uCardGroup = m.top.findNode("m3uCardGroup")
+    m3uFocusBorder = m.top.findNode("m3uFocusBorder")
+    m3uCardBackground = m.top.findNode("m3uCardBackground")
+    m3uBottomTitle = m.top.findNode("m3uBottomTitle")
+    
+    if personalStaticGroup = invalid
+        print "DynamicContentScreen.brs - [loadPersonalPageContent] ERROR: personalStaticGroup not found!"
+        return
+    end if
+    
+    if m3uCardGroup = invalid
+        print "DynamicContentScreen.brs - [loadPersonalPageContent] ERROR: m3uCardGroup not found!"
+        return
+    end if
+    
+    ' Show the static group
+    personalStaticGroup.visible = true
+    
+    ' Set up focus handling for the M3U card
+    m3uCardGroup.observeField("focusedChild", "onM3UCardFocusChanged")
+    
+    ' Store M3U URL for later use
+    m.personalM3UUrl = "https://apsattv.com/ssungusa.m3u"
+    
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] Static personal group shown"
     
     ' Hide loading state
     hideLoadingState()
-    
+
     ' Hide global loader
     parentScene = m.top.getParent()
     if parentScene <> invalid
         parentScene.callFunc("hideGlobalLoader")
     end if
+
+    ' Don't set focus here - let setInitialFocus handle it
+    print "DynamicContentScreen.brs - [loadPersonalPageContent]   Focus will be set by setInitialFocus"
+
+    print "DynamicContentScreen.brs - [loadPersonalPageContent] *** Personal page STATIC content loaded successfully ***"
+end sub
+
+sub onM3UCardFocusChanged()
+    m3uCardGroup = m.top.findNode("m3uCardGroup")
+    m3uFocusIndicator = m.top.findNode("m3uFocusIndicator")
+    m3uBottomTitle = m.top.findNode("m3uBottomTitle")
     
-    ' Build display with proper sizing (this will call returnFocusToNavigation)
-    buildContentDisplay(contentNode)
+    if m3uCardGroup = invalid then return
     
-    print "DynamicContentScreen.brs - [loadPersonalPageContent] Personal page content loaded successfully"
+    if m3uCardGroup.hasFocus()
+        print "DynamicContentScreen.brs - [onM3UCardFocusChanged] M3U card FOCUSED"
+        ' Show focus indicator outline
+        if m3uFocusIndicator <> invalid
+            m3uFocusIndicator.opacity = 0.3
+        end if
+        ' Change title color when focused
+        if m3uBottomTitle <> invalid
+            m3uBottomTitle.color = "0xFFFFFFFF"
+        end if
+    else
+        print "DynamicContentScreen.brs - [onM3UCardFocusChanged] M3U card UNFOCUSED"
+        ' Hide focus indicator outline
+        if m3uFocusIndicator <> invalid
+            m3uFocusIndicator.opacity = 0.0
+        end if
+        ' Reset title color when unfocused
+        if m3uBottomTitle <> invalid
+            m3uBottomTitle.color = "0xCCCCCCFF"
+        end if
+    end if
 end sub
 
 sub showLoadingState()
     print "DynamicContentScreen.brs - [showLoadingState] Showing loading indicator"
-    
+
     m.top.isLoading = true
     m.loadingGroup.visible = true
     m.contentRowList.visible = false
     m.noContentGroup.visible = false
+    
+    ' Also hide personalRowList when showing loading
+    personalRowList = m.top.findNode("personalRowList")
+    if personalRowList <> invalid
+        personalRowList.visible = false
+    end if
 end sub
 
 sub hideLoadingState()
@@ -728,16 +799,9 @@ sub buildContentDisplay(contentItems as object)
     
     hideLoadingState()
     
-    ' Hide global loader
-    print "DynamicContentScreen.brs - [buildContentDisplay] Attempting to hide global loader"
-    parentScene = m.top.getParent()
-    if parentScene <> invalid
-        print "DynamicContentScreen.brs - [buildContentDisplay] Parent scene found, calling hideGlobalLoader"
-        parentScene.callFunc("hideGlobalLoader")
-        print "DynamicContentScreen.brs - [buildContentDisplay] hideGlobalLoader called successfully"
-    else
-        print "DynamicContentScreen.brs - [buildContentDisplay] ERROR: Parent scene not found!"
-    end if
+    ' NOTE: Global loader is managed by HomeScene.brs in onNavigationDataReceived()
+    ' It will be hidden after ALL screens are created and initial content is loaded
+    ' Do NOT hide it here as it would dismiss too early before other screens load
     
     ' Content items are already grouped by category from the API
     if contentItems.Count() = 0
@@ -1117,7 +1181,7 @@ sub onItemSelected()
                     ' Check if this is an M3U Playlist (typeId = 99 or type = "m3u_playlist")
                     if itemContentType = "m3u_playlist" or itemTypeId = 99
                         print "DynamicContentScreen.brs - [onItemSelected] *** M3U PLAYLIST DETECTED - Navigating to M3UChannelScreen ***"
-                        
+
                         ' Navigate to M3UChannelScreen for M3U playlist
                         navigateToM3UScreen(selectedItem)
                         return
@@ -1600,37 +1664,39 @@ sub navigateToM3UScreen(selectedItem as object)
     
     ' Find or create the M3UChannelScreen component
     parentScene = m.top.getParent()
-    if parentScene <> invalid
-        m3uScreen = parentScene.findNode("m3uChannelScreen")
-        
-        if m3uScreen = invalid
-            print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen not found, creating new one"
-            
-            ' Create M3UChannelScreen
-            m3uScreen = CreateObject("roSGNode", "M3UChannelScreen")
-            m3uScreen.id = "m3uChannelScreen"
-            m3uScreen.translation = [0, 0]
-            
-            ' Add to parent scene
-            parentScene.appendChild(m3uScreen)
-            print "DynamicContentScreen.brs - [navigateToM3UScreen] Created and added M3UChannelScreen to scene"
-        else
-            print "DynamicContentScreen.brs - [navigateToM3UScreen] Found existing M3UChannelScreen"
-        end if
-        
-        ' Hide current screen
-        m.top.visible = false
-        print "DynamicContentScreen.brs - [navigateToM3UScreen] Hidden Personal content screen"
-        
-        ' Set M3U URL and show M3U screen
-        m3uScreen.m3uUrl = m3uUrl
-        m3uScreen.visible = true
-        m3uScreen.setFocus(true)
-        
-        print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen shown and focused"
-    else
+    if parentScene = invalid
         print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: Could not find parent scene"
+        return
     end if
+    
+    m3uScreen = parentScene.findNode("m3uChannelScreen")
+    
+    if m3uScreen = invalid
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen not found, creating dynamically..."
+        
+        ' Create M3UChannelScreen dynamically
+        m3uScreen = CreateObject("roSGNode", "M3UChannelScreen")
+        m3uScreen.id = "m3uChannelScreen"
+        m3uScreen.translation = [0, 0]
+        m3uScreen.visible = false
+        
+        ' Add to parent scene
+        parentScene.appendChild(m3uScreen)
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen created and added to scene"
+    else
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] Found existing M3UChannelScreen"
+    end if
+
+    ' Hide current screen
+    m.top.visible = false
+    print "DynamicContentScreen.brs - [navigateToM3UScreen] Hidden Personal content screen"
+
+    ' Set M3U URL and show M3U screen
+    m3uScreen.m3uUrl = m3uUrl
+    m3uScreen.visible = true
+    m3uScreen.setFocus(true)
+
+    print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen shown and focused"
 end sub
 
 ' Fetch series data with seasons and episodes using SeriesApi Task
@@ -2076,6 +2142,25 @@ sub setInitialFocus()
         return
     end if
     
+    ' Check if we're showing Personal page static group
+    personalStaticGroup = m.top.findNode("personalStaticGroup")
+    if personalStaticGroup <> invalid and personalStaticGroup.visible = true
+        print "DynamicContentScreen.brs - [setInitialFocus] Personal page static group visible"
+        if m.top.explicitContentFocusRequested = true
+            print "DynamicContentScreen.brs - [setInitialFocus] Explicit content focus requested, setting focus on M3U card"
+            m3uCardGroup = m.top.findNode("m3uCardGroup")
+            if m3uCardGroup <> invalid
+                m3uCardGroup.setFocus(true)
+                print "DynamicContentScreen.brs - [setInitialFocus] M3U card focused"
+            end if
+            m.top.explicitContentFocusRequested = false ' Reset the flag
+        else
+            print "DynamicContentScreen.brs - [setInitialFocus] Personal page - returning focus to navigation"
+            returnFocusToNavigation()
+        end if
+        return
+    end if
+    
     ' Only focus content if explicitly requested (e.g., user pressed RIGHT from navigation)
     ' We'll add a flag to indicate when content focus is actually wanted
     if m.top.explicitContentFocusRequested = true and m.contentRowList <> invalid and m.contentRowList.visible = true and m.contentRowList.content <> invalid and m.contentRowList.content.getChildCount() > 0
@@ -2156,6 +2241,30 @@ end sub
 function onKeyEvent(key as string, press as boolean) as boolean
     print "DynamicContentScreen.brs - [onKeyEvent] Key: " + key + ", Press: " + press.ToStr() + ", hasFocus: " + m.top.hasFocus().ToStr()
     if press
+        ' Handle Personal page static M3U card
+        if m.top.contentTypeId = 16
+            m3uCardGroup = m.top.findNode("m3uCardGroup")
+            if m3uCardGroup <> invalid and m3uCardGroup.hasFocus()
+                if key = "OK"
+                    print "DynamicContentScreen.brs - [onKeyEvent] OK pressed on Personal M3U card - navigating to M3U screen"
+                    ' Create a content item with M3U URL
+                    selectedItem = CreateObject("roSGNode", "ContentNode")
+                    selectedItem.addFields({
+                        m3uUrl: "https://apsattv.com/ssungusa.m3u",
+                        contentType: "m3u_playlist",
+                        typeId: 99,
+                        title: "Samsung USA Channels"
+                    })
+                    navigateToM3UScreen(selectedItem)
+                    return true
+                else if key = "left" or key = "back"
+                    print "DynamicContentScreen.brs - [onKeyEvent] LEFT/BACK pressed on Personal M3U card - returning to navigation"
+                    returnFocusToNavigation()
+                    return true
+                end if
+            end if
+        end if
+        
         ' Handle authentication required state
         if m.showingAuthRequired = true
             if key = "right"

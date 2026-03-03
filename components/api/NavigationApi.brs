@@ -16,6 +16,11 @@ sub GetNavigationData()
     request.AddHeader("Content-Type", "application/json")
     request.AddHeader("Accept", "application/json")
     
+    ' Set connection timeout (3 seconds)
+    request.SetConnectionTimeout(3000)
+    request.EnablePeerVerification(false)
+    request.EnableHostVerification(false)
+    
     ' Retrieve and add authentication token
     authData = RetrieveAuthData()
     if authData <> invalid and authData.accessToken <> invalid and authData.accessToken <> ""
@@ -25,14 +30,56 @@ sub GetNavigationData()
         print "NavigationApi.brs - [GetNavigationData] WARNING: No valid auth token found, making request without authentication"
     end if
     
-    ' Make the request
-    print "NavigationApi.brs - [GetNavigationData] About to make HTTP request..."
-    response = request.GetToString()
+    ' Use async request with timeout
+    print "NavigationApi.brs - [GetNavigationData] Starting ASYNC HTTP request..."
+    port = CreateObject("roMessagePort")
+    request.SetPort(port)
     
-    print "NavigationApi.brs - [GetNavigationData] Response Length: " + response.Len().ToStr()
+    if request.AsyncGetToString()
+        print "NavigationApi.brs - [GetNavigationData] Async request started, waiting for response..."
+        
+        ' Wait for response with timeout (3 seconds)
+        startTime = CreateObject("roDateTime").AsSeconds()
+        maxWaitTime = 3
+        response = invalid
+        responseCode = -1
+        
+        while true
+            msg = wait(500, port)  ' Wait 500ms for message
+            currentTime = CreateObject("roDateTime").AsSeconds()
+            elapsed = currentTime - startTime
+            
+            if msg <> invalid
+                if type(msg) = "roUrlEvent"
+                    print "NavigationApi.brs - [GetNavigationData] Received roUrlEvent"
+                    responseCode = msg.GetResponseCode()
+                    response = msg.GetString()
+                    print "NavigationApi.brs - [GetNavigationData] Response code: " + responseCode.ToStr()
+                    exit while
+                end if
+            else if elapsed >= maxWaitTime
+                print "NavigationApi.brs - [GetNavigationData] Request TIMED OUT after " + elapsed.ToStr() + " seconds"
+                exit while
+            end if
+        end while
+    else
+        print "NavigationApi.brs - [GetNavigationData] ERROR: Failed to start async request"
+        responseCode = -1
+        response = invalid
+    end if
     
-    if response <> "" and response <> invalid
-        print "NavigationApi.brs - [GetNavigationData] Response received: " + response
+    print "NavigationApi.brs - [GetNavigationData] *** HTTP REQUEST COMPLETED ***"
+    
+    if response <> invalid
+        print "NavigationApi.brs - [GetNavigationData] Response Length: " + response.Len().ToStr()
+    else
+        print "NavigationApi.brs - [GetNavigationData] Response is INVALID (request failed or timed out)"
+    end if
+    
+    ' Check if we got a valid response
+    if response <> invalid and response <> "" and responseCode >= 200 and responseCode < 300
+        print "NavigationApi.brs - [GetNavigationData] Response received successfully"
+        print "NavigationApi.brs - [GetNavigationData] Response preview: " + Left(response, 200)
         
         ' Parse and validate the response
         parsedResponse = ParseJson(response)
@@ -51,19 +98,26 @@ sub GetNavigationData()
                 print "NavigationApi.brs - [GetNavigationData] Valid navigation data received with " + responseDataField.Count().ToStr() + " items"
                 m.top.responseData = response
             else
-                print "NavigationApi.brs - [GetNavigationData] WARNING: Unexpected response structure, but passing through: " + response
+                print "NavigationApi.brs - [GetNavigationData] WARNING: Unexpected response structure, but passing through"
                 ' Pass through the response anyway - let the navigation bar handle it
                 m.top.responseData = response
             end if
         else
             print "NavigationApi.brs - [GetNavigationData] ERROR: Failed to parse JSON response"
+            print "NavigationApi.brs - [GetNavigationData] Using default navigation data instead"
             m.top.errorMessage = "Failed to parse navigation data"
+            setDefaultNavigationData()
         end if
     else
-        print "NavigationApi.brs - [GetNavigationData] ERROR: Empty response from server"
-        m.top.errorMessage = "No response from navigation API"
-        ' Let the navigation bar handle the empty response with its own defaults
-        m.top.responseData = ""
+        ' Request failed, timed out, or returned error code
+        print "NavigationApi.brs - [GetNavigationData] ERROR: Request failed"
+        print "NavigationApi.brs - [GetNavigationData] Response code: " + responseCode.ToStr()
+        print "NavigationApi.brs - [GetNavigationData] Response is invalid: " + (response = invalid).ToStr()
+        print "NavigationApi.brs - [GetNavigationData] Response is empty: " + (response = "").ToStr()
+        print "NavigationApi.brs - [GetNavigationData] Using default navigation data instead"
+        m.top.errorMessage = "API request failed (code: " + responseCode.ToStr() + ")"
+        ' Use default navigation data instead of empty response
+        setDefaultNavigationData()
     end if
 end sub
 
