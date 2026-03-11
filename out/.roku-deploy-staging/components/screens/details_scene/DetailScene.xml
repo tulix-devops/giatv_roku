@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<component name="DetailsScene" extends="Group">
+    <script type="text/brightscript" uri="pkg:/components/screens/details_scene/DetailScene.brs"/>
+    <script type="text/brightscript" uri="pkg:/components/helpers/VodEntityHelper.brs" />
+    <script type="text/brightscript" uri="pkg:/components/helpers/RokuBillingHelper.brs" />
+    <script type="text/brightscript"  uri="pkg:/components/misc/BackDialog.brs"/>
+    <interface>
+        <field id="detailScreenData" type="array" />
+        <field id="dTitle" type="string" />
+        <field id="dDescr" type="string" />
+        <field id="dPosterUri" type="string" />
+        <field id="dTrailerUri" type="string" />
+        <field id="dVideoUri" type="string" />
+        <field id="relatedDataEntity" type="array" />
+        <field id="parentNavigator" type="string" />
+        <field id="navigatedFrom" type="string" />
+    </interface>
+    <children>
+        <!-- <default_poster id="default_poster" translation="[0, 0]" visible="true" /> -->
+
+
+        <Animation
+            id="activateDetailsPage"
+            duration="0.2"
+            repeat="false"
+            easeFunction="linear"
+        >
+            <Vector2DFieldInterpolator
+        id="translationInterpolator"
+        key="[0.0, 1.0]"
+        keyValue="[ [1920, 0], [0, 0]  ]"
+        fieldToInterp="selectedVod.translation"
+    />
+        </Animation>
+        <Animation
+            id="deactivateDetailsPage"
+            duration="0.3"
+            repeat="false"
+            easeFunction="linear"
+        >
+            <Vector2DFieldInterpolator
+        id="translationInterpolator"
+        key="[0.0, 1.0]"
+        keyValue="[[0, 0], [1920, 0]   ]"
+        fieldToInterp="selectedVod.translation"
+    />
+        </Animation>
+        <Group id="selectedVod" translation="[0, 0]" visible="true" scale="1">
+            <!-- <Group id="topContainer" translation="[0, 0]" visible="true" scale="1"
+            width="1920"
+            height="551"
+            > -->
+            <Rectangle
+            id="topContainer"
+            width="1920"
+            height="451"
+            translation="[0, 0]"
+            color="#222222">
+                <ItemDetails id="itemDetailSceneLayout" translation="[50, 0]" visible="true">
+            </ItemDetails>
+                <Poster
+            id="posterThumb"
+            uri=""
+            width="1220"
+            height="450"
+            translation="[700, 0]"
+            />
+            </Rectangle>
+            <!-- <Group id="bottomContainer" translation="[0, 551]"
+            width="1920"
+            height="529"> -->
+            <Rectangle
+            id="bottomContainer"
+            width="1920"
+            height="629"
+            translation="[0, 451]"
+            color="#222222">
+                <Group id="playButtonGroup" translation="[50, 20]" >
+                    <!-- Play Button -->
+                    <Poster
+                id="playButtonIcon"
+                uri="pkg:/images/png/play_button_empty.png"
+                width="42"
+                height="42"
+                translation="[0, 0]" 
+                />
+                    <Label text="Play" id="playButtonText" color="0xFFFFFF" font="font:UrbanistRegular" translation="[65, 5]" >
+                        <Font role="font" uri="pkg:/images/UrbanistRegular.ttf" size="25" />
+                    </Label>
+                </Group>
+                <Group id="trailerGroup" translation="[50, 90]" focusable="true">
+                    <!-- Play Button -->
+                    <!-- Watch Trailer Button -->
+                    <Poster
+                id="watchTrailerButtonIcon"
+                uri="pkg:/images/png/play_button_empty.png"
+                width="42"
+                height="42"
+                translation="[0, 0]" 
+                />
+                    <Label text="Watch Trailer"  id="trailerButtonText" color="0xFFFFFF" font="font:UrbanistRegular" translation="[65, 5]" >
+                        <Font role="font" uri="pkg:/images/UrbanistRegular.ttf" size="25" />
+                    </Label>
+                </Group>
+                <Group id="moreLikeThisGroup" translation="[50, 160]" >
+                    <!-- Play Button -->
+                    <!-- Watch Trailer Button -->
+                    <Poster
+                id="moreLikeThisButtonIcon"
+                uri="pkg:/images/png/more_like_this_empty.png"
+                width="42"
+                height="42"
+                translation="[0, 0]"
+                />
+                    <Label text="More like this"  id="moreLikeThisButtonText" color="0xFFFFFF" font="font:UrbanistRegular" translation="[65, 5]" >
+                        <Font role="font" uri="pkg:/images/UrbanistRegular.ttf" size="25" />
+                    </Label>
+                </Group>
+                <Group id="episodesGroup" translation="[50, 230]" visible="false">
+                    <!-- Play Button -->
+                    <!-- Watch Trailer Button -->
+                    <Poster
+                id="episodesButtonIcon"
+                uri="pkg:/images/png/more_like_this_empty.png"
+                width="42"
+                height="42"
+                translation="[0, 0]"
+                loadDisplayMode="scaleToZoom"
+                />
+                    <Label text="Episodes"  id="episodesButtonText" color="0xFFFFFF" font="font:UrbanistRegular" translation="[65, 5]" >
+                        <Font role="font" uri="pkg:/images/UrbanistRegular.ttf" size="25" />
+                    </Label>
+                </Group>
+            </Rectangle>
+            <Group id="relatedContainer" translation="[50, 730]"
+            >
+                <RowList 
+                  id = "relatedList" 
+                  translation = "[ 0, 0 ]" 
+                  itemComponentName = "RowListItem" 
+                  itemSize = "[ 1920, 420 ]" 
+                  rowItemSize = "[ [350, 250] ]"  
+                  itemSpacing = "[ 0, 0 ]" 
+                  rowItemSpacing = "[ [15,20] ]"
+                  rowLabelOffset="[[0, 15]]"
+                  showRowLabel = "[ true ]"
+                  drawFocusFeedback = "true"
+                  rowHasFocus = "false"
+                  numRows="2"
+                  rowFocusAnimationStyle="fixedFocus"
+                  focusBitmapUri="pkg:/images/png/shapes/focusable_white.9.png"
+                  />
+            </Group>
+            <Group id="episodesContainer" translation="[50, 730]">
+                <RowList 
+                  id = "episodesList" 
+                  translation = "[ 0, 0 ]" 
+                  itemComponentName = "RowListItem" 
+                  itemSize = "[ 1920, 420 ]" 
+                  rowItemSize = "[ [350, 250] ]"  
+                  itemSpacing = "[ 0, 0 ]" 
+                  rowItemSpacing = "[ [15,20] ]"
+                  rowLabelOffset="[[0, 15]]"
+                  showRowLabel = "[ true ]"
+                  drawFocusFeedback = "true"
+                  rowHasFocus = "false"
+                  numRows="2"
+                  rowFocusAnimationStyle="fixedFocus"
+                  focusBitmapUri="pkg:/images/png/shapes/focusable_white.9.png"
+                  />
+            </Group>
+            <BusySpinner
+                    translation="[910, 180]"
+                    id="spinner"
+                    uri="pkg:/images/png/loader.png"
+                    visible="false"
+                    control="start"
+                    clockwise="true"
+                    spinInterval="2"
+                />
+        </Group>
+        <!-- <Group id="selectedVod" translation="[0, 0]" visible="true" scale="1">
+            <Poster
+            id="posterThumb"
+            uri=""
+            width="1220"
+            height="550"
+            translation="[700, 0]"
+            />
+            <ItemDetails id="itemDetailSceneLayout" translation="[50, 0]" visible="true">
+            </ItemDetails>   
+        </Group> -->
+    </children>
+</component>

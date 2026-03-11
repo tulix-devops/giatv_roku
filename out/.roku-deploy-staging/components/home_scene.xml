@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="home_scene" extends="Scene">
+  <script type="text/brightscript" uri="pkg:/components/home_scene.brs" />
+  <script type="text/brightscript" uri="pkg:/source/StaticContent.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/ChannelEntityHelper.brs" />
+  <script type="text/brightscript" uri="pkg:/components/helpers/ContentItemHelper.brs" />
+  <interface>
+    <!-- <field id="liveChannelsEntity" type="array" onChange="updateLiveChannels"/> -->
+    <field id="navBarUnfocused" type="bool" onChange=""/>
+    <field id="exitApp" type="boolean" value="false" />
+    <field id="isContentExpanded" type="bool" value="false"/>
+    <function name="setScreenFocus" />
+    <function name="switchScreenContent" />
+    <function name="reloadAppData" />
+    <function name="showNavigationAndHomeScreen" />
+    <function name="expandContent" />
+    <function name="collapseContent" />
+    <function name="rebuildContentScreens" />
+    <function name="showGlobalLoader" />
+    <function name="hideGlobalLoader" />
+  </interface>
+  <children>
+    <!-- Content Expand/Collapse Animations -->
+    <Animation id="expandContentAnimation" duration="0.25" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="expandContentInterpolator" key="[0.0, 1.0]" keyValue="[[240, 0], [0, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
+    </Animation>
+    <Animation id="collapseContentAnimation" duration="0.25" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="collapseContentInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [240, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
+    </Animation>
+    
+    <!-- Banner Expand/Collapse Animations -->
+    <Animation id="expandBannerAnimation" duration="0.25" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="expandBannerInterpolator" key="[0.0, 1.0]" keyValue="[[240, 0], [0, 0]]" fieldToInterp="homeBannerGroup.translation"/>
+    </Animation>
+    <Animation id="collapseBannerAnimation" duration="0.25" easeFunction="outCubic">
+      <Vector2DFieldInterpolator id="collapseBannerInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [240, 0]]" fieldToInterp="homeBannerGroup.translation"/>
+    </Animation>
+
+    <Rectangle
+            id="backgroundRectangle"
+            width="1920" 
+            height="1080"
+            color="#0f1419" translation="[0, 0]"/>
+    
+    <!-- Home Banner (positioned to align with content area, right of 240px nav bar) -->
+    <Group id="homeBannerGroup" translation="[240, 0]" visible="false" z="1" opacity="1.0">
+      <!-- Banner Image (full height 1080, width 2160 to cover full screen in both collapsed and expanded states) -->
+        <Poster
+          id="homeBanner"
+          uri="pkg:/images/img/new_banner_screen.jpg"
+          width="2160"
+          height="1080"
+          translation="[-240, 0]"
+          loadDisplayMode="scaleToFill"
+          opacity="1.0" />
+      
+      <!-- Banner Text Overlay (moved right for better positioning) -->
+        <Group id="bannerTextGroup" translation="[80, 120]" opacity="1.0">
+        <!-- Clean Title - Light Blue -->
+        <Label
+          id="bannerTitle"
+          text="Online Entertainment Platform"
+          color="#4FC3F7"
+          font="font:UrbanistBold"
+          translation="[0, 0]"
+          width="900"
+          height="80"
+          wrap="true">
+          <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="52" />
+        </Label>
+        
+        <!-- Description Text -->
+        <Label
+          id="bannerDescription"
+          text="Popular Live TV Channels with 7 day DVR recordings.&#10;FREE Live Streaming. IPTV ready M3U management &amp; more."
+          color="#ffffff"
+          font="font:UrbanistMedium"
+          translation="[0, 110]"
+          width="800"
+          height="140"
+          wrap="true"
+          lineSpacing="10">
+          <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26" />
+        </Label>
+      </Group>
+    </Group>
+    
+    <!-- Original Navigation -->
+    <dynamic_navigation_bar id="dynamic_navigation_bar" translation="[0, 0]" visible="false" z="10" />
+    
+    <!-- Vertical Row-based Navigation (for testing) -->
+    <vertical_navigation_bar id="vertical_navigation_bar" translation="[0, 0]" visible="false" />
+    
+    <!-- NEW: Markup-based Navigation (proven approach) -->
+    <markup_navigation_bar id="markup_navigation_bar" translation="[0, 0]" visible="false" />
+    <!-- Dynamic content screens will be created programmatically -->
+    <Group id="dynamicScreensContainer" translation="[240, 0]" z="2" />
+    
+    <!-- Static screens - z value lower than nav bar (z=10) to render behind it -->
+    <search_screen id="search_screen" translation="[240, 0]" visible="false" z="5" />
+    <account_screen id="account_screen" translation="[240, 0]" visible="false" z="5" />
+    <!-- <podcast_screen id ="podcast_screen" translation="[140, 0]" visible="false" /> -->
+    <login_screen id ="login_screen" translation="[0, 0]" visible="false" />
+    <!-- <Animation
+            id="showParentGroupAnimation"
+            duration="1.0"
+            repeat="false"
+            easeFunction="linear"
+        >
+            <FloatFieldInterpolator
+                id="opacityInterpolator"
+                key="[1.0, 0.4 ]"
+                keyValue="[1.0, 0.4]"
+                fieldToInterp="liveScreenGroup.opacity"
+            />
+        </Animation> -->
+    <DetailsScene id ="detailScene" translation="[0, 0]" visible="false" />
+    <!-- <VideoScreen id="videoPlayerScreen" translation="[0, 0]" visible="false" /> -->
+    <VideoDVRScreen
+    id="videoDVRScreen" translation="[0, 0]" visible="false"
+    ></VideoDVRScreen>
+
+    <DVRListingScreen
+    id="DVRListingScreen" translation="[0, 0]" visible="false"
+    ></DVRListingScreen>
+
+        <SeasonScreen
+    id="SeasonScreen" translation="[0, 0]" visible="false"
+    ></SeasonScreen>
+    
+    <!-- M3UChannelScreen will be created dynamically when user clicks on M3U item -->
+    
+    <SplashPage id="splashPage" translation="[0,0]" visible = "true"/>
+    
+    <!-- Global Loading Screen - Full Screen Overlay -->
+    <Group id="globalLoader" translation="[0, 0]" visible="false" z="100">
+      <!-- Full screen background overlay -->
+      <Rectangle
+        id="loaderBackground"
+        width="1920"
+        height="1080"
+        color="#0f1419"
+        opacity="0.95"
+        translation="[0, 0]" />
+      
+      <!-- Center container for logo and loading elements -->
+      <Group id="loaderContent" translation="[960, 540]">
+        <!-- Large GiaTV Logo -->
+        <Poster
+          id="loaderLogo"
+          uri="pkg:/images/img/gia-tv-big.png"
+          width="300"
+          height="300"
+          translation="[-150, -200]"
+          loadDisplayMode="scaleToFit"
+          opacity="1.0" />
+        
+        <!-- Loading Text -->
+        <Label
+          id="loaderText"
+          text="Loading Content..."
+          color="#ffffff"
+          font="font:UrbanistBold"
+          horizAlign="center"
+          vertAlign="center"
+          translation="[-250, 80]"
+          width="500"
+          height="50">
+          <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="38" />
+        </Label>
+        
+        <!-- Animated loading dots -->
+        <Group id="loadingDots" translation="[-40, 130]">
+          <Rectangle id="dot1" width="12" height="12" color="#4FC3F7" translation="[0, 0]" />
+          <Rectangle id="dot2" width="12" height="12" color="#4FC3F7" translation="[20, 0]" />
+          <Rectangle id="dot3" width="12" height="12" color="#4FC3F7" translation="[40, 0]" />
+          <Rectangle id="dot4" width="12" height="12" color="#4FC3F7" translation="[60, 0]" />
+        </Group>
+      </Group>
+    </Group>
+    
+    <!-- <LoginScreen id ="login_screen" translation="[0, 0]" visible="true" /> -->
+  </children>
+</component>

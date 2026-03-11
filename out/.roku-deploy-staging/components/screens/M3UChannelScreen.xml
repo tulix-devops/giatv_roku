@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="M3UChannelScreen" extends="Group" focusable="true">
+    <interface>
+        <field id="m3uUrl" type="string" onChange="onM3uUrlChanged"/>
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/components/screens/M3UChannelScreen.brs"/>
+
+    <children>
+        <!-- Background -->
+        <Rectangle
+            id="backgroundRect"
+            width="1920"
+            height="1080"
+            color="#0f1419"
+            translation="[0, 0]"/>
+
+        <!-- Screen Header with Tab Name and Branding -->
+        <Group id="screenHeaderGroup" translation="[25, 15]" visible="true">
+            <!-- Left side: Tab Name • Timestamp -->
+            <Group id="headerLeftGroup" translation="[0, 0]">
+                <!-- Tab Name -->
+                <Label
+                    id="screenTabName"
+                    text="M3U Channels"
+                    color="#ffffff"
+                    font="font:UrbanistBold"
+                    horizAlign="left"
+                    vertAlign="center"
+                    translation="[0, 42]"
+                    height="36">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32"/>
+                </Label>
+                
+                <!-- Dot Separator -->
+                <Label
+                    id="screenDotSeparator"
+                    text="•"
+                    color="#6366f1"
+                    font="font:UrbanistBold"
+                    horizAlign="center"
+                    vertAlign="center"
+                    translation="[260, 42]"
+                    width="20"
+                    height="36">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32"/>
+                </Label>
+                
+                <!-- Local Time Display -->
+                <Label
+                    id="screenTimeLabel"
+                    text="00:00"
+                    color="#ffffff"
+                    font="font:UrbanistMedium"
+                    horizAlign="left"
+                    vertAlign="center"
+                    translation="[280, 44]"
+                    height="32">
+                    <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
+                </Label>
+            </Group>
+            
+            <!-- Right side: GiaTV Logo -->
+            <Poster
+                id="screenBrandIcon"
+                uri="pkg:/images/img/gia-tv-small.png"
+                width="120"
+                height="120"
+                translation="[1710, 0]"
+                loadDisplayMode="scaleToFit"/>
+            
+            <!-- Header Divider Line -->
+            <Rectangle
+                id="headerDivider"
+                width="1850"
+                height="2"
+                color="0x3A4A6AFF"
+                translation="[0, 125]"/>
+        </Group>
+
+        <!-- Loading indicator -->
+        <Group id="loadingGroup" translation="[890, 540]" visible="true">
+            <Label
+                id="loadingLabel"
+                text="Loading channels..."
+                color="#ffffff"
+                font="font:UrbanistMedium"
+                horizAlign="center"
+                translation="[-100, 0]"
+                width="200">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
+            </Label>
+        </Group>
+
+        <!-- Grid View for Channels (landscape 16:9) -->
+        <MarkupGrid
+            id="channelGrid"
+            translation="[25, 155]"
+            visible="false"
+            itemComponentName="M3UChannelItem"
+            itemSize="[360, 250]"
+            numColumns="5"
+            numRows="3"
+            itemSpacing="[15, 15]"
+            drawFocusFeedback="true"/>
+        
+        <!-- Clock Timer -->
+        <Timer
+            id="clockTimer"
+            repeat="true"
+            duration="60"/>
+    </children>
+</component>

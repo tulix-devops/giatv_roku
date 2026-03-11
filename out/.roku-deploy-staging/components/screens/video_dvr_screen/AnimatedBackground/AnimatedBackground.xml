@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<component name="AnimatedBackground" extends="Panel" >
+
+  <interface>
+
+    <!-- URL for the image used as the animated background -->
+
+    <field id="imageURL" type="string" onChange="onImageChanged" />
+
+  </interface>
+
+  <script type="text/brightscript" uri="pkg:/components/screens/video_dvr_screen/AnimatedBackground/AnimatedBackground.brs" />
+
+  <children>
+
+    <Poster
+      id="poster2"
+      width="1920"
+      height="1080"
+      scaleRotateCenter="[960.0, 540.0]" />
+
+    <Poster
+      id="poster"
+      width="1920"
+      height="1080"
+      scaleRotateCenter="[960.0, 540.0]" />
+
+    <!-- Image dimming -->
+
+    <Rectangle
+      id="dimming"
+      width="1920"
+      height="1080"
+      color="0x000000"
+      opacity="0.5" />
+
+    <!-- Animation for images -->
+
+    <ParallelAnimation
+      id="posterParallelAnimation" >
+
+      <!-- First image -->
+
+      <Animation
+        id="posterScaleAnimation"
+        easeFunction="linear"
+        repeat="true"
+        duration="8">
+
+        <Vector2DFieldInterpolator
+          key="[0.0, 0.2, 1.0]"
+          keyValue="[[1.0, 1.0], [1.0, 1.0], [2.0, 2.0]]"
+          fieldToInterp="poster.scale"/>
+
+      </Animation>
+
+      <Animation
+        id="posterOpacityAnimation"
+        easeFunction="linear"
+        repeat="true"
+        duration="8">
+
+        <FloatFieldInterpolator
+          key="[0.0, 0.2, 0.6, 1.0]"
+          keyValue="[0.0, 0.0, 1.0, 0.0]"
+          fieldToInterp="poster.opacity"/>
+
+      </Animation>
+
+      <!-- Second image -->
+
+      <Animation
+        id="poster2ScaleAnimation"
+        easeFunction="linear"
+        repeat="true"
+        delay="4"
+        duration="8">
+
+        <Vector2DFieldInterpolator
+          key="[0.0, 0.2, 1.0]"
+          keyValue="[[1.0, 1.0], [1.0, 1.0], [2.0, 2.0]]"
+          fieldToInterp="poster2.scale"/>
+
+      </Animation>
+
+      <Animation
+        id="poster2OpacityAnimation"
+        easeFunction="linear"
+        delay="4"
+        repeat="true"
+        duration="8">
+
+        <FloatFieldInterpolator
+          key="[0.0, 0.2, 0.6, 1.0]"
+          keyValue="[0.2, 0.2, 1.0, 0.0]"
+          fieldToInterp="poster2.opacity"/>
+
+      </Animation>
+
+    </ParallelAnimation>
+
+  </children>
+
+</component>

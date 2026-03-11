@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="NavigationItemComponent" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="OnContentSet" />
+    </interface>
+    <script type="text/brightscript" uri="NavigationItemComponent.brs" />
+    <children>
+        <Group>
+            <!-- Focus Background -->
+            <Rectangle
+                id="focusBackground"
+                width="180"
+                height="70"
+                color="#f16667"
+                opacity="0.3"
+                translation="[0, 0]"
+                visible="false"
+            />
+            
+            <!-- Navigation Item Background -->
+            <Rectangle
+                id="itemBackground"
+                width="180"
+                height="70"
+                color="#2a2a3e"
+                opacity="0.8"
+                translation="[0, 0]"
+            />
+            
+            <!-- Navigation Title -->
+            <Label
+                id="navTitle"
+                text=""
+                color="#ffffff"
+                font="font:UrbanistMedium"
+                horizAlign="center"
+                vertAlign="center"
+                translation="[0, 0]"
+                width="180"
+                height="70"
+            >
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="22" />
+            </Label>
+        </Group>
+    </children>
+</component>

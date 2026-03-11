@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="M3UChannelItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChanged"/>
+        <field id="focusPercent" type="float" onChange="onFocusPercentChanged"/>
+    </interface>
+
+    <script type="text/brightscript" uri="M3UChannelItem.brs"/>
+
+    <children>
+        <!-- Background card (landscape 16:9) -->
+        <Rectangle
+            id="background"
+            width="360"
+            height="203"
+            color="0x2A2A2AFF"
+            opacity="1.0"/>
+
+        <!-- Channel logo/poster (larger, landscape) -->
+        <Poster
+            id="channelPoster"
+            width="360"
+            height="203"
+            loadDisplayMode="scaleToZoom"
+            failedBitmapUri="pkg:/images/png/gia-tv-logo.png"
+            loadingBitmapUri="pkg:/images/png/gia-tv-logo.png"/>
+
+        <!-- Focus indicator -->
+        <Rectangle
+            id="focusIndicator"
+            width="360"
+            height="203"
+            color="#f16667"
+            translation="[0, 0]"
+            opacity="0.0"/>
+        
+        <!-- Title below card -->
+        <Label
+            id="bottomTitle"
+            text=""
+            width="360"
+            height="40"
+            translation="[0, 210]"
+            color="0xCCCCCCFF"
+            font="font:TinyBoldSystemFont"
+            horizAlign="left"
+            vertAlign="top"
+            maxLines="2"
+            ellipsisText="..."/>
+    </children>
+</component>

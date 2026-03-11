@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="search_screen" extends="Group">
+    <script type="text/brightscript" uri="pkg:/components/screens/search_screen/search_screen.brs" />
+    <script type="text/brightscript" uri="pkg:/components/helpers/VodEntityHelper.brs" />
+    <interface>
+        <field id="searchDataEntity" type="array" />
+    </interface>
+    <children>
+        <Poster
+        uri="pkg:/images/png/gradient.jpeg"
+        width="1920"
+        height="1080"
+        loadDisplayMode="scaleToFill"
+        translation="[0, 0]"/>
+        <!-- <default_poster id="default_poster" translation="[0, 0]" visible="true" /> -->
+        <Group id="searchContainer" translation="[50, 200]" visible="false">
+            <RowList 
+                  id = "searchList" 
+                  translation = "[ 0, 0 ]" 
+                  itemComponentName = "SearchItemComponent" 
+                  itemSize = "[ 1920, 420 ]" 
+                  itemSpacing = "[ 0, 0 ]" 
+                  rowItemSpacing = "[ [15, 0] ]"
+                  rowLabelOffset="[[0, 0]]"
+                  showRowLabel = "[ true ]"
+                  drawFocusFeedback = "true"
+                  rowHasFocus = "false"
+                  numRows="2"
+                  rowFocusAnimationStyle="fixedFocus"
+                  focusBitmapUri="pkg:/images/png/shapes/focusable_white.9.png"
+                  />
+        </Group>
+        <Animation
+        id="activateKeyboard"
+        duration="0.3"
+        repeat="false"
+        easeFunction="linear"
+    >
+            <Vector2DFieldInterpolator
+            id="translationInterpolator"
+            key="[0.0, 1.0]"
+            keyValue="[ [35, 1080], [35, 650] ]"
+            fieldToInterp="keyboard.translation"
+        />
+        </Animation>
+        <Animation
+            id="deactivateKeyboard"
+            duration="0.3"
+            repeat="false"
+            easeFunction="linear"
+            >
+            <Vector2DFieldInterpolator
+                id="translationInterpolator"
+                key="[0.0, 1.0]"
+                keyValue="[ [35, 650], [35, 1080]  ]"
+                fieldToInterp="keyboard.translation"
+            />
+        </Animation>
+        <Keyboard
+        id="keyboard"
+        showTextEditBox="false"
+        translation="[35, 1080]"
+        focusable="true"
+        visible="false" />
+        <!-- <Poster
+            uri="pkg:/images/png/shapes/search_page_tile.png"
+            width="1700"
+            height="100"
+            translation="[20, 20]"/> -->
+        <TextEditBox  
+            id="searchBox"
+            translation="[50, 30]" 
+            focusable="true"
+            width="1000" 
+            height="80"
+            hintText=" Enter search keyword"
+            text=""
+            keyColor="0xDDDDDDFF"
+            focusedKeyColor="0xFFFFFFFF"
+            cursorColor="0xFFFFFFFF" />
+        <Group id="applyButton" translation="[1070, 30]" >
+            <!-- Play Button -->
+            <!-- Watch Trailer Button -->
+            <Poster
+                id="submit"
+                uri="pkg:/images/png/shapes/grey_rounded.png"
+                width="200"
+                height="80"
+                translation="[0, 0]"
+                loadDisplayMode="scaleToZoom"
+                />
+            <Label text="Submit"  id="buttonLabel" color="0xFFFFFF" font="font:UrbanistSemiBold" translation="[65, 25]" >
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="25" />
+            </Label>
+        </Group>
+    </children>
+</component>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SeasonScreen" extends="Group" initialFocus="seasonLabelList">
+    <interface>
+        <field id="arrayDVRs" type="array" onChange="onDVRsLoaded"/>
+        <field id="DVRParent" type="node" />
+        <field id="navigatedFrom" type="string" />
+        <field id="content" type="node" alias="episodeGrid.content" />
+        <field id="rowItemSelected" type="intarray" alias="episodeGrid.itemSelected" alwaysnotify="true"/>
+        <field id="itemFocused" type="intarray" alias="episodeGrid.itemFocused" onChange="onEpisodeFocused"/>
+        <field id="focusedContent" type="node"/>
+        <field id="numBadRequests" type="integer"/>
+    </interface>
+    
+    <script type="text/brightscript" uri="pkg:/components/screens/season_screen/SeasonScreen.brs" />
+    
+    <children>
+        <!-- Dark Background (same as home screen) -->
+        <Rectangle
+            id="backgroundRect"
+            width="1920"
+            height="1080"
+            color="#0f1419"
+            translation="[0, 0]"/>
+        
+        <!-- Header Section -->
+        <Group id="headerGroup" translation="[100, 25]">
+            <!-- Series Title (left side) -->
+            <Label 
+                id="screenTitle"
+                text="Seasons"
+                height="60"
+                width="1200"
+                font="font:LargeBoldSystemFont"
+                horizAlign="left"
+                vertAlign="center"
+                color="0xFFFFFFFF"/>
+            
+            <!-- GiaTV Logo (right side - bigger version) -->
+            <Poster
+                id="headerLogo"
+                uri="pkg:/images/img/gia-tv-small.png"
+                width="120"
+                height="120"
+                translation="[1570, -55]"/>
+        </Group>
+        
+        <!-- Header Divider Line -->
+        <Rectangle
+            id="headerDivider"
+            width="1720"
+            height="2"
+            color="#111184"
+            translation="[100, 105]"/>
+        
+        <!-- Main Content Container (moved right and down for more spacing) -->
+        <Group id="contentContainer" translation="[100, 140]">
+            
+            <!-- Left Side: Season List -->
+            <Group id="seasonListContainer" translation="[0, 10]">
+                <!-- Vertical Season List using LabelList -->
+                <LabelList
+                    id="seasonLabelList"
+                    translation="[0, 0]"
+                    itemSize="[280, 35]"
+                    numRows="14"
+                    focusRow="0"
+                    drawFocusFeedback="true"
+                    focusBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
+                    focusFootprintBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
+                    color="0xFFFFFFFF"
+                    focusedColor="0x3A4A6AFF"
+                    font="font:SmallSystemFont"
+                    focusedFont="font:SmallSystemFont"
+                    vertFocusAnimationStyle="floatingFocus"
+                    itemSpacing="[0, 35]"
+                    sectionDividerLeftOffset="20"
+                    wrap="false"/>
+            </Group>
+            
+            <!-- Vertical Divider between Seasons and Episodes -->
+            <!-- <Rectangle
+                id="verticalDivider"
+                width="2"
+                height="850"
+                color="#C1D8F0"
+                translation="[290, -10]"/> -->
+            
+            <!-- Right Side: Episode Grid -->
+            <Group id="episodeGridContainer" translation="[330, 0]">
+                <MarkupGrid
+                    id="episodeGrid"
+                    translation="[0, 0]"
+                    itemComponentName="SeasonEpisodeItem"
+                    itemSize="[400, 280]"
+                    numColumns="3"
+                    numRows="3"
+                    columnSpacing="30"
+                    rowSpacing="30"
+                    itemSpacing="[30, 30]" 
+                    drawFocusFeedback="true"
+                    drawFocusFeedbackOnTop="true"
+                    skipFocusAnimations="false"
+                    vertFocusAnimationStyle="floatingFocus"/>
+            </Group>
+        </Group>
+        <!-- focusBitmapUri="pkg:/images/png/shapes/focusable_white.9.png" -->
+        <!-- Legacy elements (hidden, for compatibility) -->
+        <Group id="tvShowContainer" translation="[20, 20]" visible="false">
+            <RowList 
+                id="tvShowSeasonList" 
+                translation="[20, 10]" 
+                itemComponentName="RowListCategoryComponent" 
+                itemSize="[1920, 300]" 
+                rowItemSize="[[250, 100]]" 
+                numRows="2"
+                visible="false"/>
+            <MarkupGrid
+                id="episodeRowList"
+                translation="[20, 220]"
+                itemComponentName="RowListItem"
+                itemSize="[420, 300]"
+                numColumns="4"
+                numRows="4"
+                visible="false"/>
+        </Group>
+        
+        <RowList
+            id="RowList"
+            translation="[-100, 600]"
+            numRows="9"
+            itemComponentName="DVRItem"
+            itemSize="[2320, 320]"
+            visible="false"/>
+    </children>
+</component>

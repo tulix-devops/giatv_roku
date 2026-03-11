@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<component name="SplashPage" extends="Group">
+    <interface>
+        <!-- <field id="contentURL" type="string" onChange="onContentURLChanged" /> -->
+    </interface>
+    <children>
+        <!-- <Video
+            id="splashVideoPlayer"
+            translation="[0, 0]"
+            width="1920"
+            height="1080"
+            /> -->
+        <Rectangle color ="#000000"
+            width="1920" 
+            height="1080"
+            translation="[0,0]"
+            >
+            <Poster
+            id="splash_screen"
+            uri="pkg:/images/png/resized_splash.png"
+            width="540"
+            height="405"
+            loadDisplayMode="scaleToZoom"
+            translation="[690, 337]"
+            />
+
+                  <!-- width="230"
+            height="115"
+            translation="[845, 482]" -->
+        </Rectangle>
+        <Timer
+            id="splashTimer"
+            repeat="false"
+            duration="4"
+                />
+    </children>
+    <script type="text/brightscript" uri="pkg:/components/screens/splash_screen/SplashScreen.brs" />
+</component>
