@@ -3,7 +3,21 @@ sub init()
     
     m.top.focusable = true
     m.channelGrid = m.top.findNode("channelGrid")
+    m.searchResultsGrid = m.top.findNode("searchResultsGrid")
     m.loadingGroup = m.top.findNode("loadingGroup")
+    m.channelCountLabel = m.top.findNode("channelCountLabel")
+    m.selectedIndexLabel = m.top.findNode("selectedIndexLabel")
+    m.searchPromptLabel = m.top.findNode("searchPromptLabel")
+    m.searchStatusGroup = m.top.findNode("searchStatusGroup")
+    m.searchQueryText = m.top.findNode("searchQueryText")
+    m.searchClearHint = m.top.findNode("searchClearHint")
+    
+    ' Search state
+    m.isSearchMode = false
+    m.searchQuery = ""
+    m.filteredChannels = []
+    m.activeGrid = m.channelGrid
+    m.searchKeyboard = invalid
     
     ' Header elements
     m.screenHeaderGroup = m.top.findNode("screenHeaderGroup")
@@ -12,12 +26,25 @@ sub init()
     m.screenTimeLabel = m.top.findNode("screenTimeLabel")
     m.clockTimer = m.top.findNode("clockTimer")
     
+    ' Pagination variables
+    m.channelsPerPage = 100
+    m.currentPage = 0
+    m.totalChannels = 0
+    m.loadedChannels = 0
+    
     ' Observe visibility changes to manage focus
     m.top.observeField("visible", "onVisibilityChanged")
     
-    ' Observe channel selection
+    ' Observe channel selection and focus for auto-pagination
     if m.channelGrid <> invalid
         m.channelGrid.observeField("itemSelected", "onChannelSelected")
+        m.channelGrid.observeField("itemFocused", "onChannelFocused")
+    end if
+    
+    ' Observe search results grid
+    if m.searchResultsGrid <> invalid
+        m.searchResultsGrid.observeField("itemSelected", "onSearchResultSelected")
+        m.searchResultsGrid.observeField("itemFocused", "onSearchResultFocused")
     end if
     
     ' Observe clock timer
@@ -274,24 +301,53 @@ sub parseM3UContent(content as String)
     end for
     
     print "M3UChannelScreen.brs - [parseM3UContent] Parsing complete. Total channels: " + m.channels.Count().ToStr()
-    
-    ' Print first 5 channels for debugging
+
+    ' Print first 10 channels for debugging with detailed structure
     if m.channels.Count() > 0
-        print "M3UChannelScreen.brs - [parseM3UContent] ========== FIRST 5 CHANNELS =========="
-        maxPrint = 5
+        print "M3UChannelScreen.brs - [parseM3UContent] ========== FIRST 10 CHANNELS DETAILED =========="
+        maxPrint = 10
         if m.channels.Count() < maxPrint then maxPrint = m.channels.Count()
-        
+
         for i = 0 to maxPrint - 1
             ch = m.channels[i]
-            print "M3UChannelScreen.brs - [parseM3UContent] Channel " + i.ToStr() + ":"
+            print "M3UChannelScreen.brs - [parseM3UContent] ========== Channel " + i.ToStr() + " =========="
             print "  name: " + ch.name
-            if ch.channelNumber <> invalid then print "  number: " + ch.channelNumber
-            if ch.category <> invalid then print "  category: " + ch.category
-            if ch.logo <> invalid then print "  logo: " + ch.logo
-            if ch.url <> invalid then print "  url: " + Left(ch.url, 60)
+            print "  name type: " + Type(ch.name)
+            
+            if ch.channelNumber <> invalid
+                print "  channelNumber: " + ch.channelNumber
+                print "  channelNumber type: " + Type(ch.channelNumber)
+            else
+                print "  channelNumber: INVALID/MISSING"
+            end if
+            
+            if ch.category <> invalid
+                print "  category: " + ch.category
+                print "  category type: " + Type(ch.category)
+            else
+                print "  category: INVALID/MISSING"
+            end if
+            
+            if ch.logo <> invalid
+                print "  logo: " + ch.logo
+                print "  logo type: " + Type(ch.logo)
+                print "  logo length: " + Len(ch.logo).ToStr()
+            else
+                print "  logo: INVALID/MISSING"
+            end if
+            
+            if ch.url <> invalid
+                print "  url: " + Left(ch.url, 80)
+                print "  url type: " + Type(ch.url)
+            else
+                print "  url: INVALID/MISSING"
+            end if
+            
+            ' Print all keys in the channel object
+            print "  All keys in channel object: " + FormatJson(ch.Keys())
         end for
         print "M3UChannelScreen.brs - [parseM3UContent] =========================================="
-        
+
         buildChannelGrid()
     else
         showError("No channels found in playlist")
@@ -299,24 +355,373 @@ sub parseM3UContent(content as String)
 end sub
 
 sub buildChannelGrid()
-    print "M3UChannelScreen.brs - [buildChannelGrid] Building channel grid with " + m.channels.Count().ToStr() + " channels"
+    print "M3UChannelScreen.brs - [buildChannelGrid] Building initial channel grid with " + m.channels.Count().ToStr() + " total channels"
+    
+    m.totalChannels = m.channels.Count()
+    m.currentPage = 0
+    m.loadedChannels = 0
     
     ' Create content node for MarkupGrid (flat list, no rows)
-    contentNode = CreateObject("roSGNode", "ContentNode")
+    if m.channelGrid.content = invalid
+        contentNode = CreateObject("roSGNode", "ContentNode")
+        m.channelGrid.content = contentNode
+    end if
     
-    ' Add all channels as direct children (MarkupGrid handles the grid layout)
+    ' Load first page
+    loadChannelPage()
+    
+    ' Hide loading indicator
+    if m.loadingGroup <> invalid
+        m.loadingGroup.visible = false
+    end if
+    
+    ' Show grid and set focus
+    m.channelGrid.visible = true
+    m.channelGrid.setFocus(true)
+    
+    ' Show and update channel counter and selected index
+    updateChannelCounter()
+    updateSelectedIndex()
+    
+    ' Show search prompt
+    if m.searchPromptLabel <> invalid
+        m.searchPromptLabel.visible = true
+    end if
+    
+    print "M3UChannelScreen.brs - [buildChannelGrid] Initial grid built with " + m.loadedChannels.ToStr() + " channels"
+end sub
+
+sub loadChannelPage()
+    print "M3UChannelScreen.brs - [loadChannelPage] Loading page " + m.currentPage.ToStr()
+    
+    contentNode = m.channelGrid.content
+    if contentNode = invalid then return
+    
+    startIndex = m.currentPage * m.channelsPerPage
+    endIndex = startIndex + m.channelsPerPage - 1
+    if endIndex >= m.totalChannels then endIndex = m.totalChannels - 1
+    
+    print "M3UChannelScreen.brs - [loadChannelPage] Loading channels " + startIndex.ToStr() + " to " + endIndex.ToStr()
+    
     channelCount = 0
-    for each channel in m.channels
-        itemNode = contentNode.createChild("ContentNode")
+    channelsWithLogo = 0
+    channelsWithoutLogo = 0
+    
+    for i = startIndex to endIndex
+        if i >= m.channels.Count() then exit for
         
-        ' Set title (required)
+        channel = m.channels[i]
+        if channel = invalid then continue for
+        
+        itemNode = contentNode.createChild("ContentNode")
+        if itemNode = invalid then continue for
+        
+        ' Set title with fallback
+        channelTitle = "Channel " + (i + 1).ToStr()
         if channel.name <> invalid and channel.name <> ""
-            itemNode.title = channel.name
+            channelTitle = channel.name
+        end if
+        itemNode.title = channelTitle
+        
+        ' Set description
+        if channel.channelNumber <> invalid and channel.channelNumber <> ""
+            itemNode.description = "Ch " + channel.channelNumber
         else
-            itemNode.title = "Channel " + channelCount.ToStr()
+            itemNode.description = ""
         end if
         
-        ' Set description with channel number
+        ' Set logo/poster with detailed logging for first 5 items
+        hasLogo = false
+        if channel.logo <> invalid and channel.logo <> ""
+            itemNode.hdPosterUrl = channel.logo
+            hasLogo = true
+            channelsWithLogo = channelsWithLogo + 1
+            
+            ' Detailed logging for first 5 items
+            if channelCount < 5
+                print "M3UChannelScreen.brs - [loadChannelPage] Channel " + i.ToStr() + " LOGO ASSIGNED:"
+                print "    Title: " + channelTitle
+                print "    Logo URL: " + channel.logo
+                print "    Logo Length: " + Len(channel.logo).ToStr()
+            end if
+        else
+            channelsWithoutLogo = channelsWithoutLogo + 1
+            
+            ' Log missing logo for first 5 items
+            if channelCount < 5
+                print "M3UChannelScreen.brs - [loadChannelPage] Channel " + i.ToStr() + " NO LOGO:"
+                print "    Title: " + channelTitle
+                print "    Logo field: " + Type(channel.logo)
+            end if
+        end if
+        
+        ' Set category
+        if channel.category <> invalid and channel.category <> ""
+            itemNode.addFields({ category: channel.category })
+        end if
+        
+        ' Store stream URL
+        if channel.url <> invalid and channel.url <> ""
+            itemNode.addFields({ streamUrl: channel.url })
+        end if
+        
+        channelCount = channelCount + 1
+        m.loadedChannels = m.loadedChannels + 1
+    end for
+    
+    print "M3UChannelScreen.brs - [loadChannelPage] Logo statistics for this page:"
+    print "    Channels WITH logo: " + channelsWithLogo.ToStr()
+    print "    Channels WITHOUT logo: " + channelsWithoutLogo.ToStr()
+    print "    Percentage with logo: " + (channelsWithLogo * 100 / channelCount).ToStr() + "%"
+    
+    m.currentPage = m.currentPage + 1
+    
+    ' Update channel counter
+    updateChannelCounter()
+    
+    print "M3UChannelScreen.brs - [loadChannelPage] Loaded " + channelCount.ToStr() + " channels. Total loaded: " + m.loadedChannels.ToStr()
+end sub
+
+sub updateChannelCounter()
+    if m.channelCountLabel = invalid then return
+    
+    if m.isSearchMode
+        ' Show search results count
+        if m.searchQuery <> ""
+            counterText = m.filteredChannels.Count().ToStr() + " results for '" + m.searchQuery + "'"
+        else
+            counterText = m.loadedChannels.ToStr() + " channels (search mode)"
+        end if
+        m.channelCountLabel.text = counterText
+        m.channelCountLabel.visible = true
+    else if m.totalChannels > 0
+        ' Show normal channel count
+        counterText = m.loadedChannels.ToStr() + " of " + m.totalChannels.ToStr() + " channels loaded"
+        m.channelCountLabel.text = counterText
+        m.channelCountLabel.visible = true
+    else
+        m.channelCountLabel.visible = false
+    end if
+end sub
+
+sub updateSelectedIndex()
+    if m.selectedIndexLabel = invalid then return
+    
+    activeGrid = m.activeGrid
+    if activeGrid = invalid then return
+    
+    focusedIndex = activeGrid.itemFocused
+    totalItems = 0
+    
+    if m.isSearchMode
+        totalItems = m.filteredChannels.Count()
+    else
+        totalItems = m.loadedChannels
+    end if
+    
+    if focusedIndex >= 0 and totalItems > 0
+        ' Display 1-based index (user-friendly)
+        indexText = "Item " + (focusedIndex + 1).ToStr() + " of " + totalItems.ToStr() + " selected"
+        m.selectedIndexLabel.text = indexText
+        m.selectedIndexLabel.visible = true
+    else
+        m.selectedIndexLabel.visible = false
+    end if
+end sub
+
+sub showSearchKeyboard()
+    print "M3UChannelScreen.brs - [showSearchKeyboard] Showing search keyboard"
+
+    ' Create keyboard dialog programmatically (like in account_screen)
+    m.searchKeyboard = CreateObject("roSGNode", "KeyboardDialog")
+    m.searchKeyboard.title = "Search Channels"
+    m.searchKeyboard.text = ""
+    m.searchKeyboard.buttons = ["Search", "Cancel"]
+    m.searchKeyboard.observeField("buttonSelected", "onSearchKeyboardButton")
+    m.searchKeyboard.observeField("wasClosed", "onSearchKeyboardClosed")
+    
+    ' Show the dialog
+    m.top.GetScene().dialog = m.searchKeyboard
+end sub
+
+sub onSearchKeyboardButton()
+    if m.searchKeyboard = invalid then return
+    
+    buttonIndex = m.searchKeyboard.buttonSelected
+    print "M3UChannelScreen.brs - [onSearchKeyboardButton] Button selected: " + buttonIndex.ToStr()
+    
+    if buttonIndex = 0
+        ' Search button
+        searchText = m.searchKeyboard.text
+        if searchText <> invalid and searchText <> ""
+            m.searchQuery = searchText.Trim()
+            print "M3UChannelScreen.brs - [onSearchKeyboardButton] Search query: '" + m.searchQuery + "'"
+            
+            if m.searchQuery <> ""
+                m.searchKeyboard.close = true
+                enterSearchMode()
+                performSearch()
+            else
+                m.searchKeyboard.keyboard.textEditBox.hintText = "Please enter search text"
+            end if
+        else
+            m.searchKeyboard.keyboard.textEditBox.hintText = "Please enter search text"
+        end if
+    else if buttonIndex = 1
+        ' Cancel button
+        print "M3UChannelScreen.brs - [onSearchKeyboardButton] Search cancelled"
+        m.searchKeyboard.close = true
+        
+        ' Return focus to active grid
+        if m.activeGrid <> invalid
+            m.activeGrid.setFocus(true)
+        end if
+    end if
+end sub
+
+sub onSearchKeyboardClosed()
+    print "M3UChannelScreen.brs - [onSearchKeyboardClosed] Keyboard dialog closed"
+    
+    ' Return focus to active grid
+    if m.activeGrid <> invalid
+        m.activeGrid.setFocus(true)
+    end if
+end sub
+
+sub onSearchKeyboardText()
+    ' This fires as user types - we can show live preview if needed
+    if m.searchKeyboard <> invalid
+        currentText = m.searchKeyboard.text
+        if currentText <> invalid
+            print "M3UChannelScreen.brs - [onSearchKeyboardText] Current text: '" + currentText + "'"
+        end if
+    end if
+end sub
+
+sub enterSearchMode()
+    print "M3UChannelScreen.brs - [enterSearchMode] Entering search mode"
+    
+    m.isSearchMode = true
+    m.activeGrid = m.searchResultsGrid
+    
+    ' Hide search prompt, show search status
+    if m.searchPromptLabel <> invalid
+        m.searchPromptLabel.visible = false
+    end if
+    if m.searchStatusGroup <> invalid
+        m.searchStatusGroup.visible = true
+    end if
+    
+    ' Update search display
+    updateSearchDisplay()
+end sub
+
+sub exitSearchMode()
+    print "M3UChannelScreen.brs - [exitSearchMode] Exiting search mode"
+    
+    m.isSearchMode = false
+    m.searchQuery = ""
+    m.filteredChannels = []
+    
+    ' Show search prompt, hide search status
+    if m.searchPromptLabel <> invalid
+        m.searchPromptLabel.visible = true
+    end if
+    if m.searchStatusGroup <> invalid
+        m.searchStatusGroup.visible = false
+    end if
+    
+    ' Switch back to main grid
+    if m.searchResultsGrid <> invalid
+        m.searchResultsGrid.visible = false
+    end if
+    if m.channelGrid <> invalid
+        m.channelGrid.visible = true
+        m.channelGrid.setFocus(true)
+        m.activeGrid = m.channelGrid
+    end if
+    
+    ' Update displays
+    updateChannelCounter()
+    updateSelectedIndex()
+end sub
+
+sub updateSearchDisplay()
+    if m.searchQueryText <> invalid and m.searchQuery <> invalid
+        m.searchQueryText.text = m.searchQuery
+    end if
+end sub
+
+sub performSearch()
+    print "M3UChannelScreen.brs - [performSearch] Searching for: '" + m.searchQuery + "'"
+    
+    if m.searchQuery = ""
+        ' Empty search - show all loaded channels
+        m.filteredChannels = []
+        for i = 0 to m.loadedChannels - 1
+            if i < m.channels.Count()
+                m.filteredChannels.Push(m.channels[i])
+            end if
+        end for
+    else
+        ' Filter channels by search query
+        m.filteredChannels = []
+        searchLower = LCase(m.searchQuery)
+        
+        for i = 0 to m.loadedChannels - 1
+            if i >= m.channels.Count() then exit for
+            
+            channel = m.channels[i]
+            if channel <> invalid
+                ' Search in channel name and category
+                matchFound = false
+                
+                if channel.name <> invalid and channel.name <> ""
+                    if LCase(channel.name).Instr(searchLower) > 0
+                        matchFound = true
+                    end if
+                end if
+                
+                if not matchFound and channel.category <> invalid and channel.category <> ""
+                    if LCase(channel.category).Instr(searchLower) > 0
+                        matchFound = true
+                    end if
+                end if
+                
+                if matchFound
+                    m.filteredChannels.Push(channel)
+                end if
+            end if
+        end for
+    end if
+    
+    ' Build search results grid
+    buildSearchResults()
+    
+    print "M3UChannelScreen.brs - [performSearch] Found " + m.filteredChannels.Count().ToStr() + " matching channels"
+end sub
+
+sub buildSearchResults()
+    if m.searchResultsGrid = invalid then return
+    
+    ' Create content node for search results
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    
+    channelCount = 0
+    for each channel in m.filteredChannels
+        if channel = invalid then continue for
+        
+        itemNode = contentNode.createChild("ContentNode")
+        if itemNode = invalid then continue for
+        
+        ' Set title with fallback
+        channelTitle = "Channel " + (channelCount + 1).ToStr()
+        if channel.name <> invalid and channel.name <> ""
+            channelTitle = channel.name
+        end if
+        itemNode.title = channelTitle
+        
+        ' Set description
         if channel.channelNumber <> invalid and channel.channelNumber <> ""
             itemNode.description = "Ch " + channel.channelNumber
         else
@@ -333,33 +738,69 @@ sub buildChannelGrid()
             itemNode.addFields({ category: channel.category })
         end if
         
-        ' Store the stream URL
+        ' Store stream URL
         if channel.url <> invalid and channel.url <> ""
             itemNode.addFields({ streamUrl: channel.url })
         end if
         
         channelCount = channelCount + 1
-        
-        ' Limit to first 100 channels for performance
-        if channelCount >= 100
-            print "M3UChannelScreen.brs - [buildChannelGrid] Limiting to first 100 channels for performance"
-            exit for
-        end if
     end for
     
-    print "M3UChannelScreen.brs - [buildChannelGrid] Added " + channelCount.ToStr() + " channels to grid"
+    ' Switch to search results grid
+    m.searchResultsGrid.content = contentNode
+    m.channelGrid.visible = false
+    m.searchResultsGrid.visible = true
+    m.searchResultsGrid.setFocus(true)
+    m.activeGrid = m.searchResultsGrid
     
-    ' Hide loading indicator
-    if m.loadingGroup <> invalid
-        m.loadingGroup.visible = false
+    ' Update displays
+    updateChannelCounter()
+    updateSelectedIndex()
+end sub
+
+sub onSearchResultSelected()
+    print "M3UChannelScreen.brs - [onSearchResultSelected] Search result selected"
+    navigateToPlayVideo()
+end sub
+
+sub onSearchResultFocused()
+    if m.searchResultsGrid = invalid then return
+    updateSelectedIndex()
+end sub
+
+sub onChannelFocused()
+    if m.channelGrid = invalid then return
+    
+    focusedIndex = m.channelGrid.itemFocused
+    
+    ' Update selected index display
+    updateSelectedIndex()
+    
+    ' Auto-load more channels when user gets close to the end
+    ' Load more when focusing on one of the last 10 items
+    triggerIndex = m.loadedChannels - 10
+    if triggerIndex < 0 then triggerIndex = 0
+    
+    if focusedIndex >= triggerIndex and m.loadedChannels < m.totalChannels
+        print "M3UChannelScreen.brs - [onChannelFocused] Auto-loading more channels (focused index: " + focusedIndex.ToStr() + ", trigger: " + triggerIndex.ToStr() + ")"
+        
+        ' Show loading indicator briefly
+        if m.loadingGroup <> invalid
+            loadingLabel = m.loadingGroup.findNode("loadingLabel")
+            if loadingLabel <> invalid
+                loadingLabel.text = "Loading more channels..."
+            end if
+            m.loadingGroup.visible = true
+        end if
+        
+        ' Load next page
+        loadChannelPage()
+        
+        ' Hide loading indicator after a short delay
+        if m.loadingGroup <> invalid
+            m.loadingGroup.visible = false
+        end if
     end if
-    
-    ' Set content and show grid
-    m.channelGrid.content = contentNode
-    m.channelGrid.visible = true
-    m.channelGrid.setFocus(true)
-    
-    print "M3UChannelScreen.brs - [buildChannelGrid] Grid built and displayed with " + contentNode.getChildCount().ToStr() + " items"
 end sub
 
 sub onChannelSelected()
@@ -376,17 +817,23 @@ sub navigateToPlayVideo()
         return
     end if
     
-    ' Get the selected channel from the grid (MarkupGrid uses flat index)
-    selectedIndex = m.channelGrid.itemFocused
+    ' Get the selected channel from the active grid
+    activeGrid = m.activeGrid
+    if activeGrid = invalid
+        print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No active grid"
+        return
+    end if
+    
+    selectedIndex = activeGrid.itemFocused
     print "M3UChannelScreen.brs - [navigateToPlayVideo] Selected index: " + selectedIndex.ToStr()
     
-    if m.channelGrid.content = invalid
-        print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No content in grid"
+    if activeGrid.content = invalid
+        print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No content in active grid"
         return
     end if
     
     ' Get the channel node
-    channelNode = m.channelGrid.content.getChild(selectedIndex)
+    channelNode = activeGrid.content.getChild(selectedIndex)
     
     if channelNode = invalid
         print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: Channel node not found"
@@ -472,6 +919,12 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     
     if press
         if key = "back"
+            ' If in search mode, exit search first
+            if m.isSearchMode
+                exitSearchMode()
+                return true
+            end if
+            
             print "M3UChannelScreen.brs - [onKeyEvent] BACK pressed, hiding M3U screen"
             
             ' Stop any playing video first
@@ -505,6 +958,10 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                 end if
             end if
             
+            return true
+        else if key = "options"
+            ' Show search keyboard dialog
+            showSearchKeyboard()
             return true
         end if
     end if

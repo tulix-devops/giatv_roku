@@ -157,7 +157,7 @@
             channelInfoBackgroundColor="#1F3B5C"
             channelNoDataText=""
             loadingDataText="TV Guide Loading..."
-            nowBarBlendColor="#FF0000"
+            nowBarBlendColor="0xFF000000"
             nowBarThickness="0"
             nowBarWidth="0"
             nowBarOffset="0"

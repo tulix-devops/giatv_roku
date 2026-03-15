@@ -88,14 +88,99 @@
                 horizAlign="center"
                 translation="[-100, 0]"
                 width="200">
-                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
             </Label>
         </Group>
 
-        <!-- Grid View for Channels (landscape 16:9) -->
+        <!-- Search Prompt (Left side) -->
+        <Label
+            id="searchPromptLabel"
+            text="Press OPTIONS for Search"
+            color="#6366f1"
+            font="font:UrbanistMedium"
+            horizAlign="left"
+            vertAlign="center"
+            translation="[25, 170]"
+            width="300"
+            height="30"
+            visible="false">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
+        </Label>
+
+        <!-- Search Status Display -->
+        <Group id="searchStatusGroup" translation="[0, 155]" visible="false">
+            <Label
+                id="searchStatusLabel"
+                text="Search: "
+                color="#ffffff"
+                font="font:UrbanistBold"
+                horizAlign="left"
+                vertAlign="center"
+                translation="[0, 0]"
+                width="80"
+                height="30">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20"/>
+            </Label>
+            <Label
+                id="searchQueryText"
+                text=""
+                color="#4FC3F7"
+                font="font:UrbanistMedium"
+                horizAlign="left"
+                vertAlign="center"
+                translation="[80, 0]"
+                width="400"
+                height="30">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
+            </Label>
+            <Label
+                id="searchClearHint"
+                text="(OPTIONS to search again, BACK to clear)"
+                color="#888888"
+                font="font:UrbanistMedium"
+                horizAlign="left"
+                vertAlign="center"
+                translation="[80, 35]"
+                width="600"
+                height="25">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="16"/>
+            </Label>
+        </Group>
+
+        <!-- Channel Count Display (Right side) -->
+        <Label
+            id="channelCountLabel"
+            text="0 channels loaded"
+            color="#ffffff"
+            font="font:UrbanistBold"
+            horizAlign="right"
+            vertAlign="center"
+            translation="[1475, 150]"
+            width="400"
+            height="40"
+            visible="false">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28"/>
+        </Label>
+
+        <!-- Selected Item Index Display -->
+        <Label
+            id="selectedIndexLabel"
+            text="Item 1 selected"
+            color="#cccccc"
+            font="font:UrbanistMedium"
+            horizAlign="right"
+            vertAlign="center"
+            translation="[1475, 190]"
+            width="400"
+            height="30"
+            visible="false">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
+        </Label>
+
+        <!-- Grid View for Channels (moved down for more spacing) -->
         <MarkupGrid
             id="channelGrid"
-            translation="[25, 155]"
+            translation="[25, 230]"
             visible="false"
             itemComponentName="M3UChannelItem"
             itemSize="[360, 250]"
@@ -103,7 +188,22 @@
             numRows="3"
             itemSpacing="[15, 15]"
             drawFocusFeedback="true"/>
+
+        <!-- Search Results Grid (same position, shows filtered results) -->
+        <MarkupGrid
+            id="searchResultsGrid"
+            translation="[25, 220]"
+            visible="false"
+            itemComponentName="M3UChannelItem"
+            itemSize="[360, 250]"
+            numColumns="5"
+            numRows="3"
+            vertFocusAnimationStyle="fixedFocus"
+            itemSpacing="[15, 15]"
+            drawFocusFeedback="true"/>
         
+        
+
         <!-- Clock Timer -->
         <Timer
             id="clockTimer"

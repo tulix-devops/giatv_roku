@@ -1,288 +1,167 @@
 sub init()
     m.top.functionName = "GetDynamicContentData"
-    print "DynamicContentApi.brs - [init] Initialized"
 end sub
 
 sub GetDynamicContentData()
-    print "DynamicContentApi.brs - [GetDynamicContentData] Called for contentTypeId: " + m.top.contentTypeId.ToStr()
-
+    contentTypeId = m.top.contentTypeId
+    
     ' Get access token from registry
     authDataJson = RegRead("authData", "AUTH")
-    print "DynamicContentApi.brs - [GetDynamicContentData] Raw authData from registry: " + authDataJson
-    
     accessToken = ""
     
     if authDataJson <> invalid and authDataJson <> ""
         authData = ParseJson(authDataJson)
         if authData <> invalid
-            print "DynamicContentApi.brs - [GetDynamicContentData] Parsed authData: " + FormatJson(authData)
-            
-            ' Check for both possible field names
             if authData.accessToken <> invalid
                 accessToken = authData.accessToken
-                print "DynamicContentApi.brs - [GetDynamicContentData] Found accessToken (camelCase): " + accessToken.Len().ToStr() + " characters"
             else if authData.accesstoken <> invalid
                 accessToken = authData.accesstoken
-                print "DynamicContentApi.brs - [GetDynamicContentData] Found accesstoken (lowercase): " + accessToken.Len().ToStr() + " characters"
-            else
-                print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: No accessToken or accesstoken field found"
-                print "DynamicContentApi.brs - [GetDynamicContentData] Available fields: " + FormatJson(authData)
             end if
-        else
-            print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: Failed to parse authData JSON"
         end if
-    else
-        print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: No authData found in registry"
     end if
     
     ' Determine API endpoint based on content type
-    apiEndpoint = getApiEndpointForContentType(m.top.contentTypeId)
-    print "DynamicContentApi.brs - [GetDynamicContentData] API endpoint for contentTypeId " + m.top.contentTypeId.ToStr() + ": " + apiEndpoint
+    apiEndpoint = getApiEndpointForContentType(contentTypeId)
     
     if apiEndpoint = ""
-        print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: No API endpoint for contentTypeId: " + m.top.contentTypeId.ToStr()
-        ' Use default content only if no endpoint is available
-        defaultResponse = getDefaultContentForType(m.top.contentTypeId)
+        defaultResponse = getDefaultContentForType(contentTypeId)
         m.top.responseData = FormatJson(defaultResponse)
-        ' Parse default content items - convert to category structure
         m.top.contentItems = defaultResponse.data
         return
     end if
 
-    ' Create HTTP request for content data (try API call even without auth)
     url = "https://giatv.dineo.uk/api/" + apiEndpoint
-    print "DynamicContentApi.brs - [GetDynamicContentData] Making request to: " + url
     
     request = CreateObject("roUrlTransfer")
     request.SetCertificatesFile("common:/certs/ca-bundle.crt")
     request.SetUrl(url)
+    request.EnablePeerVerification(false)
+    request.EnableHostVerification(false)
     
-    ' Add auth header only if we have a token
     if accessToken <> ""
         request.AddHeader("Authorization", "Bearer " + accessToken)
-        print "DynamicContentApi.brs - [GetDynamicContentData] *** USING AUTHENTICATION TOKEN ***"
-        print "DynamicContentApi.brs - [GetDynamicContentData] Token length: " + accessToken.Len().ToStr() + " characters"
-        print "DynamicContentApi.brs - [GetDynamicContentData] Token preview: " + Left(accessToken, 20) + "..."
-    else
-        print "DynamicContentApi.brs - [GetDynamicContentData] *** WARNING: NO AUTH TOKEN - MAKING UNAUTHENTICATED REQUEST ***"
-        print "DynamicContentApi.brs - [GetDynamicContentData] This may cause the API to return empty or default data"
     end if
     
     request.AddHeader("Content-Type", "application/json")
     request.AddHeader("Accept", "application/json")
     
-    ' Make the request
-    print "DynamicContentApi.brs - [GetDynamicContentData] Making HTTP request..."
-    response = request.GetToString()
-    
-    print "DynamicContentApi.brs - [GetDynamicContentData] HTTP request completed"
-    print "DynamicContentApi.brs - [GetDynamicContentData] Response is empty: " + (response = "").ToStr()
-    print "DynamicContentApi.brs - [GetDynamicContentData] Response is invalid: " + (response = invalid).ToStr()
-    if response <> invalid and response <> ""
-        print "DynamicContentApi.brs - [GetDynamicContentData] Response length: " + response.Len().ToStr()
+    ' User Channels (14) needs synchronous GetToString for proper response handling
+    if contentTypeId = 14
+        response = request.GetToString()
+        if response <> "" and response <> invalid
+            processResponse(response, contentTypeId)
+        else
+            useDefaultContent(contentTypeId)
+        end if
+        return
     end if
     
-    if response <> ""
-        ' Removed massive response printing for performance
-        ' print "DynamicContentApi.brs - [GetDynamicContentData] Response received: " + response
-        
-        ' Extra logging for User Channels (contentTypeId = 14)
-        if m.top.contentTypeId = 14
-            print "=============================================="
-            print "*** USER CHANNELS - RAW API RESPONSE ***"
-            print "=============================================="
-            print "Response length: " + response.Len().ToStr() + " characters"
-            ' Removed full JSON dump for performance
-            ' print "---------- FULL RAW JSON FROM API ----------"
-            ' print response
-            print "=============================================="
-        end if
-        
-        ' Parse and validate the response
-        ' Removed massive response printing for performance
-        ' print "DynamicContentApi.brs - [GetDynamicContentData] Raw response: " + response
-        parsedResponse = ParseJson(response)
-        if parsedResponse <> invalid
-            ' Extra logging for User Channels (contentTypeId = 14)
-            if m.top.contentTypeId = 14
-                print "DynamicContentApi.brs - [GetDynamicContentData] *** USER CHANNELS PARSED RESPONSE ***"
-                print "DynamicContentApi.brs - [GetDynamicContentData] Parsed response type: " + Type(parsedResponse)
-                
-                ' Check if it's an associative array with keys
-                keysInterface = GetInterface(parsedResponse, "ifAssociativeArray")
-                if keysInterface <> invalid
-                    print "DynamicContentApi.brs - [GetDynamicContentData] Parsed response keys:"
-                    for each key in parsedResponse.Keys()
-                        print "DynamicContentApi.brs - [GetDynamicContentData]   - " + key + ": " + Type(parsedResponse[key])
-                    end for
-                end if
-                
-                userChannelsData = parsedResponse["data"]
-                if userChannelsData <> invalid
-                    print "DynamicContentApi.brs - [GetDynamicContentData] User Channels data found!"
-                    dataArrayInterface = GetInterface(userChannelsData, "ifArray")
-                    if dataArrayInterface <> invalid
-                        print "DynamicContentApi.brs - [GetDynamicContentData] User Channels data is array with " + userChannelsData.Count().ToStr() + " items"
-                    else
-                        print "DynamicContentApi.brs - [GetDynamicContentData] User Channels data is NOT an array, type: " + Type(userChannelsData)
-                    end if
-                else
-                    print "DynamicContentApi.brs - [GetDynamicContentData] User Channels response has no 'data' field"
-                end if
-            end if
+    ' All other content types use async for parallel loading
+    port = CreateObject("roMessagePort")
+    request.SetMessagePort(port)
+    
+    if request.AsyncGetToString()
+        msg = wait(10000, port)
+        if msg <> invalid and type(msg) = "roUrlEvent"
+            responseCode = msg.GetResponseCode()
+            response = msg.GetString()
             
-            ' Check if response has expected structure
-            ' TV Guide (contentTypeId = 17) returns a direct array, not wrapped in "data"
-            hasValidData = false
-            responseDataField = invalid
-            
-            ' First check if response is a direct array (TV Guide format)
-            directArrayInterface = GetInterface(parsedResponse, "ifArray")
-            if directArrayInterface <> invalid
-                print "DynamicContentApi.brs - [GetDynamicContentData] Response is a direct array (TV Guide format)"
-                responseDataField = parsedResponse
-                hasValidData = true
+            if responseCode >= 200 and responseCode < 300 and response <> ""
+                processResponse(response, contentTypeId)
             else
-                ' Standard format: { "data": [...] }
-                responseDataField = parsedResponse["data"]
-                if responseDataField <> invalid
-                    dataInterface = GetInterface(responseDataField, "ifArray")
-                    if dataInterface <> invalid
-                        hasValidData = true
-                    end if
-                end if
-            end if
-            
-            if hasValidData
-                print "DynamicContentApi.brs - [GetDynamicContentData] Valid content data received with " + responseDataField.Count().ToStr() + " items"
-                m.top.responseData = response
-                
-                ' For TV Guide and User Channels, wrap the array in a data structure for consistent handling
-                if m.top.contentTypeId = 17
-                    print "DynamicContentApi.brs - [GetDynamicContentData] TV Guide: Converting direct array to content items"
-                    ' Convert TV Guide channels to content items format
-                    tvGuideContentItems = convertTVGuideToContentItems(responseDataField)
-                    m.top.contentItems = tvGuideContentItems
-                else if m.top.contentTypeId = 14
-                    print "DynamicContentApi.brs - [GetDynamicContentData] User Channels: Converting direct array to content items"
-                    ' Convert User Channels to content items format (wrap in category)
-                    userChannelsContentItems = convertUserChannelsToContentItems(responseDataField)
-                    m.top.contentItems = userChannelsContentItems
-                else
-                    ' Parse content items using ContentItemHelper
-                    ' The API returns categories with contents, not a flat list
-                    m.top.contentItems = responseDataField
-                end if
-                
-            else
-                print "DynamicContentApi.brs - [GetDynamicContentData] WARNING: Unexpected response structure, but passing through (length: " + response.Len().ToStr() + ")"
-                ' Pass through the response anyway - let the UI handle it
-                m.top.responseData = response
-                
-                ' Try to parse content items anyway
-                ' Pass through the response for the UI to handle
-                m.top.contentItems = []
+                useDefaultContent(contentTypeId)
             end if
         else
-            print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: Failed to parse JSON response (length: " + response.Len().ToStr() + ")"
-            print "DynamicContentApi.brs - [GetDynamicContentData] Response preview: " + Left(response, 200)
-            m.top.errorMessage = "Failed to parse content data"
-            
-            ' Check if API returned "disabled" for User Channels
-            if m.top.contentTypeId = 14 and response = "disabled"
-                print "DynamicContentApi.brs - [GetDynamicContentData] *** USER CHANNELS ENDPOINT IS DISABLED ***"
-                print "DynamicContentApi.brs - [GetDynamicContentData] This means the user doesn't have access to User Channels"
-            end if
-            
-            ' Only use defaults if we truly can't parse anything
-            defaultResponse = getDefaultContentForType(m.top.contentTypeId)
-            m.top.responseData = FormatJson(defaultResponse)
-            
-            ' Convert default data to category structure for User Channels
-            if m.top.contentTypeId = 14
-                print "DynamicContentApi.brs - [GetDynamicContentData] Converting User Channels default data to category structure"
-                userChannelsContentItems = convertUserChannelsToContentItems(defaultResponse.data)
-                m.top.contentItems = userChannelsContentItems
-            else
-                ' For other types, try to parse or use data directly
-                m.top.contentItems = defaultResponse.data
-            end if
+            useDefaultContent(contentTypeId)
         end if
     else
-        print "DynamicContentApi.brs - [GetDynamicContentData] ERROR: Empty response from server"
-        print "DynamicContentApi.brs - [GetDynamicContentData] URL that failed: " + url
-        print "DynamicContentApi.brs - [GetDynamicContentData] ContentTypeId: " + m.top.contentTypeId.ToStr()
-        
-        if m.top.contentTypeId = 14
-            print "DynamicContentApi.brs - [GetDynamicContentData] *** USER CHANNELS API RETURNED EMPTY - USING DEFAULT DATA ***"
+        useDefaultContent(contentTypeId)
+    end if
+end sub
+
+sub processResponse(response as string, contentTypeId as integer)
+    parsedResponse = ParseJson(response)
+    if parsedResponse = invalid
+        useDefaultContent(contentTypeId)
+        return
+    end if
+    
+    hasValidData = false
+    responseDataField = invalid
+    
+    ' Check if response is a direct array (TV Guide format)
+    directArrayInterface = GetInterface(parsedResponse, "ifArray")
+    if directArrayInterface <> invalid
+        responseDataField = parsedResponse
+        hasValidData = true
+    else
+        ' Standard format: { "data": [...] }
+        responseDataField = parsedResponse["data"]
+        if responseDataField <> invalid
+            dataInterface = GetInterface(responseDataField, "ifArray")
+            if dataInterface <> invalid
+                hasValidData = true
+            end if
         end if
+    end if
+    
+    if hasValidData
+        m.top.responseData = response
         
-        m.top.errorMessage = "No response from content API"
-        
-        ' Only use defaults if there's truly no response
-        defaultResponse = getDefaultContentForType(m.top.contentTypeId)
-        m.top.responseData = FormatJson(defaultResponse)
-        
-        ' Convert default data to category structure for User Channels
-        if m.top.contentTypeId = 14
-            print "DynamicContentApi.brs - [GetDynamicContentData] Converting User Channels default data to category structure"
-            userChannelsContentItems = convertUserChannelsToContentItems(defaultResponse.data)
+        if contentTypeId = 17
+            tvGuideContentItems = convertTVGuideToContentItems(responseDataField)
+            m.top.contentItems = tvGuideContentItems
+        else if contentTypeId = 14
+            userChannelsContentItems = convertUserChannelsToContentItems(responseDataField)
             m.top.contentItems = userChannelsContentItems
         else
-            ' Parse default content items - convert to category structure
-            m.top.contentItems = defaultResponse.data
+            m.top.contentItems = responseDataField
         end if
-        
-        print "DynamicContentApi.brs - [GetDynamicContentData] Using default data with " + defaultResponse.data.Count().ToStr() + " items"
+    else
+        m.top.responseData = response
+        m.top.contentItems = []
+    end if
+end sub
+
+sub useDefaultContent(contentTypeId as integer)
+    defaultResponse = getDefaultContentForType(contentTypeId)
+    m.top.responseData = FormatJson(defaultResponse)
+    
+    if contentTypeId = 14
+        userChannelsContentItems = convertUserChannelsToContentItems(defaultResponse.data)
+        m.top.contentItems = userChannelsContentItems
+    else
+        m.top.contentItems = defaultResponse.data
     end if
 end sub
 
 function getApiEndpointForContentType(contentTypeId as integer) as string
-    ' Map content type IDs to API endpoints
-    ' ACTUAL API IDs from navigation response:
-    ' - Home: 13 → content/13/home
-    ' - Live TV: 3 → content/3/home
-    ' - Movies: 1 → content/1/home
-    ' - Series: 2 → content/2/home
-    ' - User Channels: 14 → content/14/list (paginated list endpoint)
-    ' - Age Restricted: 15 → content/15/home (displays like Live TV)
-    ' - Personal: 16 → content/16/home
-    ' - TV Guide: 17 → tvguide (special endpoint for TV Guide data)
-    
     endpoint = ""
     if contentTypeId = 13
-        endpoint = "content/13/home" ' Home content (id=13)
+        endpoint = "content/13/home"
     else if contentTypeId = 3
-        endpoint = "content/3/home"  ' Live TV content (id=3)
+        endpoint = "content/3/home"
     else if contentTypeId = 1
-        endpoint = "content/1/home"  ' Movies content (id=1)
+        endpoint = "content/1/home"
     else if contentTypeId = 2
-        endpoint = "content/2/home"  ' Series/TV Shows content (id=2)
+        endpoint = "content/2/home"
     else if contentTypeId = 14
-        endpoint = "content/14/list"   ' User Channels (id=14)
+        endpoint = "content/14/list"
     else if contentTypeId = 15
-        endpoint = "content/15/home" ' Age Restricted Channels (id=15, displays like Live TV)
+        endpoint = "content/15/home"
     else if contentTypeId = 16
-        endpoint = "content/16/home" ' Personal content (id=16)
+        endpoint = "content/16/home"
     else if contentTypeId = 17
-        endpoint = "tvguide" ' TV Guide (id=17) - uses special tvguide endpoint
+        endpoint = "tvguide"
     else
-        ' Fallback: try to use the contentTypeId directly
         endpoint = "content/" + contentTypeId.ToStr() + "/home"
     end if
     
-    print "DynamicContentApi.brs - [getApiEndpointForContentType] *** API MAPPING ***"
-    print "DynamicContentApi.brs - [getApiEndpointForContentType] ContentTypeId: " + contentTypeId.ToStr()
-    print "DynamicContentApi.brs - [getApiEndpointForContentType] Endpoint: " + endpoint
-    print "DynamicContentApi.brs - [getApiEndpointForContentType] Full URL: https://giatv.dineo.uk/api/" + endpoint
     return endpoint
 end function
 
 function getDefaultContentForType(contentTypeId as integer) as object
-    ' Return default/sample content based on content type
-    ' ACTUAL API IDs: 13=Home, 3=Live TV, 1=Movies, 2=Series, 14=User Channels, 15=Age Restricted, 16=Personal, 17=TV Guide
-    
-    if contentTypeId = 13 ' Home (id=13)
+    if contentTypeId = 13
         return {
             "data": [
                 {
@@ -296,19 +175,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": "",
-                        "trailer": ""
-                    },
-                    "details": {
-                        "productionYear": "2024",
-                        "studio": "GiaTV"
-                    }
+                    "sources": { "primary": "", "hls": "", "trailer": "" },
+                    "details": { "productionYear": "2024", "studio": "GiaTV" }
                 }
             ]
         }
-    else if contentTypeId = 3 ' Live TV (id=3)
+    else if contentTypeId = 3
         return {
             "data": [
                 {
@@ -322,17 +194,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": ""
-                    },
-                    "details": {
-                        "studio": "GiaTV Live"
-                    }
+                    "sources": { "primary": "", "hls": "" },
+                    "details": { "studio": "GiaTV Live" }
                 }
             ]
         }
-    else if contentTypeId = 1 ' Movies (id=1)
+    else if contentTypeId = 1
         return {
             "data": [
                 {
@@ -346,19 +213,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": "",
-                        "trailer": ""
-                    },
-                    "details": {
-                        "productionYear": "2024",
-                        "studio": "GiaTV Movies"
-                    }
+                    "sources": { "primary": "", "hls": "", "trailer": "" },
+                    "details": { "productionYear": "2024", "studio": "GiaTV Movies" }
                 }
             ]
         }
-    else if contentTypeId = 2 ' Series/TV Shows (id=2)
+    else if contentTypeId = 2
         return {
             "data": [
                 {
@@ -374,19 +234,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": "",
-                        "trailer": ""
-                    },
-                    "details": {
-                        "productionYear": "2024",
-                        "studio": "GiaTV Series"
-                    }
+                    "sources": { "primary": "", "hls": "", "trailer": "" },
+                    "details": { "productionYear": "2024", "studio": "GiaTV Series" }
                 }
             ]
         }
-    else if contentTypeId = 14 ' User Channels (id=14)
+    else if contentTypeId = 14
         return {
             "data": [
                 {
@@ -404,13 +257,11 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "primary": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8",
                         "hls": "https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8"
                     },
-                    "details": {
-                        "studio": "User Generated"
-                    }
+                    "details": { "studio": "User Generated" }
                 }
             ]
         }
-    else if contentTypeId = 15 ' Age Restricted Channels (id=15)
+    else if contentTypeId = 15
         return {
             "data": [
                 {
@@ -424,17 +275,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": ""
-                    },
-                    "details": {
-                        "studio": "GiaTV Age Restricted"
-                    }
+                    "sources": { "primary": "", "hls": "" },
+                    "details": { "studio": "GiaTV Age Restricted" }
                 }
             ]
         }
-    else if contentTypeId = 16 ' Personal (id=16)
+    else if contentTypeId = 16
         return {
             "data": [
                 {
@@ -448,17 +294,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": ""
-                    },
-                    "details": {
-                        "studio": "Personal"
-                    }
+                    "sources": { "primary": "", "hls": "" },
+                    "details": { "studio": "Personal" }
                 }
             ]
         }
-    else if contentTypeId = 17 ' TV Guide (id=17)
+    else if contentTypeId = 17
         return {
             "data": [
                 {
@@ -472,18 +313,12 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": "",
-                        "hls": ""
-                    },
-                    "details": {
-                        "studio": "GiaTV"
-                    }
+                    "sources": { "primary": "", "hls": "" },
+                    "details": { "studio": "GiaTV" }
                 }
             ]
         }
     else
-        ' Default content
         return {
             "data": [
                 {
@@ -497,12 +332,8 @@ function getDefaultContentForType(contentTypeId as integer) as object
                         "thumbnail": "pkg:/images/png/default-logo.png",
                         "banner": "pkg:/images/png/default-logo.png"
                     },
-                    "sources": {
-                        "primary": ""
-                    },
-                    "details": {
-                        "studio": "GiaTV"
-                    }
+                    "sources": { "primary": "" },
+                    "details": { "studio": "GiaTV" }
                 }
             ]
         }
@@ -510,14 +341,6 @@ function getDefaultContentForType(contentTypeId as integer) as object
 end function
 
 function convertTVGuideToContentItems(tvGuideChannels as object) as object
-    ' Convert TV Guide channels array to content items format
-    ' TV Guide format: [{ id, name, icon, shows: [...], http, ... }, ...]
-    ' Content format: [{ id, category, contents: [...] }]
-    
-    print "DynamicContentApi.brs - [convertTVGuideToContentItems] Converting " + tvGuideChannels.Count().ToStr() + " TV Guide channels"
-    
-    ' Create a single category with all channels as contents
-    ' Note: Must use "category" field as that's what buildContentDisplay expects
     contentItems = [
         {
             "id": 17,
@@ -529,43 +352,36 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
     channelContents = []
     for each channel in tvGuideChannels
         if channel <> invalid
-            ' Get current show if available (find show airing now based on local time)
             currentShowName = ""
             currentShowDescription = ""
             if channel.shows <> invalid
                 showsInterface = GetInterface(channel.shows, "ifArray")
                 if showsInterface <> invalid and channel.shows.Count() > 0
-                    ' Get current local time
                     currentDateTime = CreateObject("roDateTime")
                     currentDateTime.ToLocalTime()
                     currentHour = currentDateTime.GetHours()
                     currentMinute = currentDateTime.GetMinutes()
                     currentTotalMinutes = currentHour * 60 + currentMinute
                     
-                    ' Find the show that's currently airing
                     currentShow = invalid
                     for each show in channel.shows
                         if show <> invalid and show.start <> invalid and show.end <> invalid
-                            ' Parse start time (HH:MM format in local time)
                             startParts = show.start.Split(":")
                             if startParts.Count() >= 2
                                 showStartHour = Val(startParts[0])
                                 showStartMinute = Val(startParts[1])
                                 showStartTotal = showStartHour * 60 + showStartMinute
                                 
-                                ' Parse end time
                                 endParts = show.end.Split(":")
                                 if endParts.Count() >= 2
                                     showEndHour = Val(endParts[0])
                                     showEndMinute = Val(endParts[1])
                                     showEndTotal = showEndHour * 60 + showEndMinute
                                     
-                                    ' Handle shows spanning midnight
                                     if showEndTotal < showStartTotal
-                                        showEndTotal = showEndTotal + 1440 ' Add 24 hours in minutes
+                                        showEndTotal = showEndTotal + 1440
                                     end if
                                     
-                                    ' Check if current time is within this show's time range
                                     if currentTotalMinutes >= showStartTotal and currentTotalMinutes < showEndTotal
                                         currentShow = show
                                         exit for
@@ -575,12 +391,10 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
                         end if
                     end for
                     
-                    ' Use current show if found, otherwise use first show as fallback
                     if currentShow <> invalid
                         if currentShow.name <> invalid then currentShowName = currentShow.name
                         if currentShow.longdescription <> invalid then currentShowDescription = currentShow.longdescription
                     else if channel.shows.Count() > 0
-                        ' Fallback to first show
                         firstShow = channel.shows[0]
                         if firstShow <> invalid
                             if firstShow.name <> invalid then currentShowName = firstShow.name
@@ -590,7 +404,6 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
                 end if
             end if
             
-            ' Build channel icon URL
             channelIcon = ""
             if channel.icon <> invalid and channel.icon <> ""
                 if Left(channel.icon, 4) = "http"
@@ -600,7 +413,6 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
                 end if
             end if
             
-            ' Get stream URL
             streamUrl = ""
             if channel.http <> invalid and channel.http <> ""
                 streamUrl = channel.http
@@ -633,20 +445,10 @@ function convertTVGuideToContentItems(tvGuideChannels as object) as object
     end for
     
     contentItems[0].contents = channelContents
-    print "DynamicContentApi.brs - [convertTVGuideToContentItems] Created " + channelContents.Count().ToStr() + " channel items"
-    
     return contentItems
 end function
 
 function convertUserChannelsToContentItems(userChannelItems as object) as object
-    ' Convert User Channels array to content items format
-    ' User Channels format: [{ id, title, description, images, sources, ... }, ...]
-    ' Content format: [{ id, category, contents: [...] }]
-    
-    print "DynamicContentApi.brs - [convertUserChannelsToContentItems] Converting " + userChannelItems.Count().ToStr() + " User Channel items"
-    
-    ' Create a single category with all channels as contents
-    ' Note: Must use "category" field as that's what buildContentDisplay expects
     contentItems = [
         {
             "id": 14,
@@ -658,8 +460,6 @@ function convertUserChannelsToContentItems(userChannelItems as object) as object
     channelContents = []
     for each channel in userChannelItems
         if channel <> invalid
-            ' User Channels items already have the correct structure from the API
-            ' Just ensure they have all required fields
             channelItem = {
                 "id": channel.id,
                 "title": channel.title,
@@ -671,10 +471,7 @@ function convertUserChannelsToContentItems(userChannelItems as object) as object
                 "details": channel.details
             }
             
-            ' Add typeId if it exists (important for content type identification)
             if channel.typeId <> invalid then channelItem.typeId = channel.typeId
-            
-            ' Add optional fields if they exist
             if channel.subtitle <> invalid then channelItem.subtitle = channel.subtitle
             if channel.episode <> invalid then channelItem.episode = channel.episode
             if channel.season <> invalid then channelItem.season = channel.season
@@ -686,8 +483,6 @@ function convertUserChannelsToContentItems(userChannelItems as object) as object
     end for
     
     contentItems[0].contents = channelContents
-    print "DynamicContentApi.brs - [convertUserChannelsToContentItems] Created " + channelContents.Count().ToStr() + " channel items in category structure"
-    
     return contentItems
 end function
 

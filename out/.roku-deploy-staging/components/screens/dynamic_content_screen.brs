@@ -795,14 +795,14 @@ sub buildContentDisplay(contentItems as object)
         print "DynamicContentScreen.brs - [buildContentDisplay] Age Restricted content detected, using SeriesItemComponent (5 per row)"
         m.contentRowList.itemComponentName = "SeriesItemComponent"
         
-        ' Size for 5 items per row: 320px width with 15px spacing
+        ' Size for 5 items per row: 340px width with 35px spacing
         for i = 0 to contentNode.getChildCount() - 1
-            rowItemSizes.Push([320, 245])
+            rowItemSizes.Push([340, 245])
             rowHeights.Push(270.0)
         end for
         m.contentRowList.rowItemSize = rowItemSizes
         m.contentRowList.rowHeights = rowHeights
-        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.rowItemSpacing = [[35, 15]]
         m.contentRowList.itemSize = [1920, 290]
         m.contentRowList.rowLabelOffset = [[0, 10]]
         
@@ -1315,10 +1315,38 @@ sub navigateToSeasonScreen(selectedItem as object)
         return
     end if
     
-    ' Get series ID - check multiple possible fields
+    ' Debug: Print all available fields in selectedItem
+    print "DynamicContentScreen.brs - [navigateToSeasonScreen] *** SELECTED ITEM DEBUG ***"
+    print "DynamicContentScreen.brs - [navigateToSeasonScreen] selectedItem type: " + Type(selectedItem)
+    
+    if Type(selectedItem) = "roSGNode"
+        print "DynamicContentScreen.brs - [navigateToSeasonScreen] Available fields:"
+        ' Check common fields
+        if selectedItem.hasField("id")
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen]   id: " + selectedItem.id.ToStr()
+        end if
+        if selectedItem.hasField("contentId")
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen]   contentId: " + selectedItem.contentId.ToStr()
+        end if
+        if selectedItem.hasField("apiData")
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen]   apiData exists: " + (selectedItem.apiData <> invalid).ToStr()
+            if selectedItem.apiData <> invalid and selectedItem.apiData.id <> invalid
+                print "DynamicContentScreen.brs - [navigateToSeasonScreen]   apiData.id: " + selectedItem.apiData.id.ToStr()
+            end if
+        end if
+        if selectedItem.hasField("title")
+            print "DynamicContentScreen.brs - [navigateToSeasonScreen]   title: " + selectedItem.title
+        end if
+    end if
+
+    ' Get series ID - check multiple possible fields, prioritize contentId
     seriesId = 0
-    if selectedItem.contentId <> invalid
+    if selectedItem.contentId <> invalid and selectedItem.contentId > 0
         seriesId = selectedItem.contentId
+        print "DynamicContentScreen.brs - [navigateToSeasonScreen] Using contentId: " + seriesId.ToStr()
+    else if selectedItem.apiData <> invalid and selectedItem.apiData.id <> invalid
+        seriesId = selectedItem.apiData.id
+        print "DynamicContentScreen.brs - [navigateToSeasonScreen] Using apiData.id: " + seriesId.ToStr()
     else if selectedItem.id <> invalid
         ' Try to convert string ID to integer
         if Type(selectedItem.id) = "roString" or Type(selectedItem.id) = "String"
@@ -1326,8 +1354,7 @@ sub navigateToSeasonScreen(selectedItem as object)
         else
             seriesId = selectedItem.id
         end if
-    else if selectedItem.apiData <> invalid and selectedItem.apiData.id <> invalid
-        seriesId = selectedItem.apiData.id
+        print "DynamicContentScreen.brs - [navigateToSeasonScreen] Using id: " + seriesId.ToStr()
     end if
     
     ' Get typeId - default to 2 for series
@@ -1512,40 +1539,67 @@ end sub
 ' Process series data object (already parsed from API response)
 sub processSeriesData(seriesData as object)
     print "DynamicContentScreen.brs - [processSeriesData] Processing series data object"
+    print "DynamicContentScreen.brs - [processSeriesData] *** SERIES DATA DEBUG ***"
+    print "DynamicContentScreen.brs - [processSeriesData] Data type: " + Type(seriesData)
     
+    ' Print all top-level keys in seriesData
+    if Type(seriesData) = "roAssociativeArray"
+        print "DynamicContentScreen.brs - [processSeriesData] Available keys:"
+        for each key in seriesData.Keys()
+            print "DynamicContentScreen.brs - [processSeriesData]   - " + key + ": " + Type(seriesData[key])
+        end for
+    end if
+
     if seriesData = invalid
         print "DynamicContentScreen.brs - [processSeriesData] ERROR: Series data is invalid"
         showSeasonScreenWithBasicInfo()
         return
     end if
-    
-    print "DynamicContentScreen.brs - [processSeriesData] Series title: " + seriesData.title
-    
+
+    if seriesData.title <> invalid
+        print "DynamicContentScreen.brs - [processSeriesData] Series title: " + seriesData.title
+    else
+        print "DynamicContentScreen.brs - [processSeriesData] No title found"
+    end if
+
     ' Convert to format expected by SeasonScreen
     ' SeasonScreen expects arrayDVRs with format: [{dvrtitle: "seasonNum", data: {"episodeNum": episodeObject}}]
     ' API returns seasons as object: {"01": [episodes], "02": [episodes], ...}
     seasonsArray = []
-    
+
     if seriesData.seasons <> invalid
         print "DynamicContentScreen.brs - [processSeriesData] Processing seasons object"
-        
+        print "DynamicContentScreen.brs - [processSeriesData] Seasons type: " + Type(seriesData.seasons)
+
         ' Seasons is an object with season numbers as keys (e.g., "01", "02", "03")
         seasonKeys = []
-        
+
         ' Collect all season keys
         for each seasonKey in seriesData.seasons
             seasonKeys.Push(seasonKey)
+            print "DynamicContentScreen.brs - [processSeriesData] Found season key: " + seasonKey
         end for
-        
+
         ' Sort season keys to display in order
         seasonKeys.Sort()
-        
+
         print "DynamicContentScreen.brs - [processSeriesData] Found " + seasonKeys.Count().ToStr() + " seasons"
+        print "DynamicContentScreen.brs - [processSeriesData] Season keys: " + FormatJson(seasonKeys)
         
         for each seasonKey in seasonKeys
             seasonEpisodes = seriesData.seasons[seasonKey]
+            print "DynamicContentScreen.brs - [processSeriesData] *** SEASON " + seasonKey + " DEBUG ***"
+            print "DynamicContentScreen.brs - [processSeriesData] Season episodes type: " + Type(seasonEpisodes)
             
-            print "DynamicContentScreen.brs - [processSeriesData] Processing Season " + seasonKey + " with " + seasonEpisodes.Count().ToStr() + " episodes"
+            if seasonEpisodes <> invalid
+                if Type(seasonEpisodes) = "roArray"
+                    print "DynamicContentScreen.brs - [processSeriesData] Processing Season " + seasonKey + " with " + seasonEpisodes.Count().ToStr() + " episodes"
+                else
+                    print "DynamicContentScreen.brs - [processSeriesData] Season " + seasonKey + " episodes is not an array, type: " + Type(seasonEpisodes)
+                end if
+            else
+                print "DynamicContentScreen.brs - [processSeriesData] Season " + seasonKey + " episodes is invalid"
+            end if
             
             ' Build episodes data map - key is episode number, value is episode data object
             episodesData = {}
@@ -1562,10 +1616,23 @@ sub processSeriesData(seriesData as object)
                         else
                             episodeNum = episodeStr
                         end if
+                        print "DynamicContentScreen.brs - [processSeriesData] Episode " + episodeNum + ": " + episode.title
+                    else
+                        print "DynamicContentScreen.brs - [processSeriesData] Episode missing episode number, using default: " + episodeNum
                     end if
                     
                     ' Store the episode data as an object
                     episodesData[episodeNum] = episode
+                end for
+            else if seasonEpisodes <> invalid
+                print "DynamicContentScreen.brs - [processSeriesData] Season episodes is not an array - trying to process as object"
+                ' Maybe episodes are stored as an object instead of array
+                for each episodeKey in seasonEpisodes
+                    episode = seasonEpisodes[episodeKey]
+                    if episode <> invalid
+                        episodesData[episodeKey] = episode
+                        print "DynamicContentScreen.brs - [processSeriesData] Episode key " + episodeKey + " added"
+                    end if
                 end for
             end if
             
@@ -1665,6 +1732,7 @@ end sub
 
 function createContentNodeFromApiData(apiItem as object) as object
     ' Convert API content item to Roku ContentNode format
+    print  "API ITEM IS HERE -> " apiItem
     if apiItem = invalid
         return invalid
     end if
@@ -2024,7 +2092,8 @@ function onKeyEvent(key as string, press as boolean) as boolean
                     ' Create a content item with M3U URL
                     selectedItem = CreateObject("roSGNode", "ContentNode")
                     selectedItem.addFields({
-                        m3uUrl: "https://apsattv.com/ssungusa.m3u",
+                        ' m3uUrl: "https://apsattv.com/ssungusa.m3u",
+                        m3uUrl: "http://svods.net:8080/get.php?username=senegal2025&password=61cab0e4&type=m3u&output=ts",
                         contentType: "m3u_playlist",
                         typeId: 99,
                         title: "Samsung USA Channels"

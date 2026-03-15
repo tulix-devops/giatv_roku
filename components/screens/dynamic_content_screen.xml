@@ -133,7 +133,8 @@
       numRows="10"
       rowFocusAnimationStyle="fixedFocus"
       rowItemSize="[280, 420]"
-      width="1700"
+      width="1500"
+      rowCounterRightOffset="80"
       height="1000" />
     
     <!-- Dedicated RowList for Personal page (M3U items) -->
@@ -151,7 +152,8 @@
       rowFocusAnimationStyle="fixedFocus"
       rowItemSize="[400, 300]"
       rowHeights="[320]"
-      width="1700"
+      width="1500"
+      rowCounterRightOffset="80"
       height="1000" />
     
     <!-- GridView for User Channels (landscape grid layout) -->
@@ -168,7 +170,8 @@
       vertFocusAnimationStyle="fixedFocus"
       drawFocusFeedback="true"
       drawFocusFeedbackOnTop="true"
-      width="1700"
+      width="1500"
+      rowCounterRightOffset="80"
       height="900" />
 
       <!-- focusBitmapBlendColor="#4FC3F7" -->

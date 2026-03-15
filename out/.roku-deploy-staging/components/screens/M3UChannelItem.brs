@@ -50,7 +50,9 @@ sub onContentChanged()
         m.channelPoster.uri = posterUrl
         print "M3UChannelItem - Poster set: " + posterUrl
     else
-        print "M3UChannelItem - No poster found, using placeholder"
+        ' Set to app logo explicitly when no channel logo exists
+        m.channelPoster.uri = "pkg:/images/png/gia-tv-logo.png"
+        print "M3UChannelItem - No poster found, using app logo placeholder"
     end if
 end sub
 
