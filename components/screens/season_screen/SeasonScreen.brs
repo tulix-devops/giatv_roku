@@ -497,44 +497,88 @@ function handleBackNavigation() as boolean
         dynamicNavBar.visible = true
     end if
     
-    ' Navigate based on source
-    if m.top.navigatedFrom = "HOME"
-        homeScreen = m.global.findNode("home_screen")
-        if homeScreen <> invalid
-            homeScreen.visible = true
-            homeScreen.setFocus(true)
+    ' Navigate based on source - navigatedFrom now contains the contentTypeId as string
+    navigatedFromId = 0
+    if m.top.navigatedFrom <> invalid and m.top.navigatedFrom <> ""
+        navigatedFromId = Val(m.top.navigatedFrom)
+        print "SeasonScreen.brs - [handleBackNavigation] Returning to screen with contentTypeId: " + navigatedFromId.ToStr()
+    end if
+    
+    ' Handle navigation based on contentTypeId
+    if navigatedFromId = 13 or m.top.navigatedFrom = "HOME"
+        ' Return to Home tab (contentTypeId = 13)
+        print "SeasonScreen.brs - [handleBackNavigation] ========== Returning to Home tab (contentTypeId=13) =========="
+        dynamicScreensContainer = m.global.findNode("dynamicScreensContainer")
+        if dynamicScreensContainer <> invalid
+            print "SeasonScreen.brs - [handleBackNavigation] Found dynamicScreensContainer with " + dynamicScreensContainer.getChildCount().ToStr() + " screens"
+            
+            for i = 0 to dynamicScreensContainer.getChildCount() - 1
+                screen = dynamicScreensContainer.getChild(i)
+                if screen <> invalid and screen.contentTypeId <> invalid
+                    print "SeasonScreen.brs - [handleBackNavigation] Checking screen " + i.ToStr() + " with contentTypeId: " + screen.contentTypeId.ToStr()
+                    
+                    if screen.contentTypeId = 13
+                        screen.visible = true
+                        print "SeasonScreen.brs - [handleBackNavigation] ✓ Found Home tab screen, making visible"
+                        
+                        ' Trigger focus restoration
+                        if screen.hasField("restoreFocusRequested")
+                            print "SeasonScreen.brs - [handleBackNavigation] Triggering restoreFocusRequested on Home tab"
+                            screen.restoreFocusRequested = true
+                            print "SeasonScreen.brs - [handleBackNavigation] ✓ restoreFocusRequested set to true"
+                        else
+                            print "SeasonScreen.brs - [handleBackNavigation] restoreFocusRequested field not found, using setFocus fallback"
+                            screen.setFocus(true)
+                        end if
+                        exit for
+                    end if
+                end if
+            end for
+        else
+            print "SeasonScreen.brs - [handleBackNavigation] ERROR: dynamicScreensContainer not found"
+        end if
+    else if navigatedFromId = 2 or m.top.navigatedFrom = "SERIES"
+        ' Return to Series tab (contentTypeId = 2)
+        print "SeasonScreen.brs - [handleBackNavigation] ========== Returning to Series tab (contentTypeId=2) =========="
+        dynamicScreensContainer = m.global.findNode("dynamicScreensContainer")
+        if dynamicScreensContainer <> invalid
+            print "SeasonScreen.brs - [handleBackNavigation] Found dynamicScreensContainer with " + dynamicScreensContainer.getChildCount().ToStr() + " screens"
+            
+            for i = 0 to dynamicScreensContainer.getChildCount() - 1
+                screen = dynamicScreensContainer.getChild(i)
+                if screen <> invalid and screen.contentTypeId <> invalid
+                    print "SeasonScreen.brs - [handleBackNavigation] Checking screen " + i.ToStr() + " with contentTypeId: " + screen.contentTypeId.ToStr()
+                    
+                    if screen.contentTypeId = 2
+                        screen.visible = true
+                        print "SeasonScreen.brs - [handleBackNavigation] ✓ Found Series tab screen, making visible"
+                        
+                        ' Trigger focus restoration
+                        if screen.hasField("restoreFocusRequested")
+                            print "SeasonScreen.brs - [handleBackNavigation] Triggering restoreFocusRequested on Series tab"
+                            screen.restoreFocusRequested = true
+                            print "SeasonScreen.brs - [handleBackNavigation] ✓ restoreFocusRequested set to true"
+                        else
+                            print "SeasonScreen.brs - [handleBackNavigation] restoreFocusRequested field not found, using setFocus fallback"
+                            screen.setFocus(true)
+                        end if
+                        exit for
+                    end if
+                end if
+            end for
+        else
+            print "SeasonScreen.brs - [handleBackNavigation] ERROR: dynamicScreensContainer not found"
         end if
     else if m.top.navigatedFrom = "SEARCH"
+        ' Return to Search screen
         searchScreen = m.global.findNode("search_screen")
         if searchScreen <> invalid
             searchScreen.visible = true
             searchScreen.setFocus(true)
         end if
-    else if m.top.navigatedFrom = "SERIES"
-        print "SeasonScreen.brs - [handleBackNavigation] Returning to Series screen"
-        dynamicScreensContainer = m.global.findNode("dynamicScreensContainer")
-        if dynamicScreensContainer <> invalid
-            for i = 0 to dynamicScreensContainer.getChildCount() - 1
-                screen = dynamicScreensContainer.getChild(i)
-                if screen <> invalid and screen.contentTypeId <> invalid and screen.contentTypeId = 2
-                    screen.visible = true
-                    print "SeasonScreen.brs - [handleBackNavigation] Found and made Series screen visible"
-                    
-                    ' Trigger focus restoration by setting a field on the screen
-                    if screen.hasField("restoreFocusRequested")
-                        screen.restoreFocusRequested = true
-                        print "SeasonScreen.brs - [handleBackNavigation] Triggered focus restoration on Series screen"
-                    else
-                        ' Fallback: set focus directly
-                        screen.setFocus(true)
-                        print "SeasonScreen.brs - [handleBackNavigation] Set focus on Series screen (fallback)"
-                    end if
-                    exit for
-                end if
-            end for
-        end if
     else
-        ' Default fallback to home
+        ' Default fallback to home_screen (old home screen component)
+        print "SeasonScreen.brs - [handleBackNavigation] No valid navigatedFrom, falling back to home_screen"
         homeScreen = m.global.findNode("home_screen")
         if homeScreen <> invalid
             homeScreen.visible = true

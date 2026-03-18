@@ -108,7 +108,7 @@
         </Label>
 
         <!-- Search Status Display -->
-        <Group id="searchStatusGroup" translation="[0, 155]" visible="false">
+        <Group id="searchStatusGroup" translation="[20, 155]" visible="false">
             <Label
                 id="searchStatusLabel"
                 text="Search: "
@@ -116,10 +116,10 @@
                 font="font:UrbanistBold"
                 horizAlign="left"
                 vertAlign="center"
-                translation="[0, 0]"
-                width="80"
+                translation="[5, 0]"
+                width="115"
                 height="30">
-                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20"/>
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="26"/>
             </Label>
             <Label
                 id="searchQueryText"
@@ -128,10 +128,10 @@
                 font="font:UrbanistMedium"
                 horizAlign="left"
                 vertAlign="center"
-                translation="[80, 0]"
+                translation="[100, 0]"
                 width="400"
                 height="30">
-                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28"/>
             </Label>
             <Label
                 id="searchClearHint"
@@ -140,10 +140,10 @@
                 font="font:UrbanistMedium"
                 horizAlign="left"
                 vertAlign="center"
-                translation="[80, 35]"
+                translation="[5, 35]"
                 width="600"
                 height="25">
-                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="16"/>
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
             </Label>
         </Group>
 
@@ -180,9 +180,10 @@
         <!-- Grid View for Channels (moved down for more spacing) -->
         <MarkupGrid
             id="channelGrid"
-            translation="[25, 230]"
+            translation="[25, 235]"
             visible="false"
             itemComponentName="M3UChannelItem"
+            vertFocusAnimationStyle="fixedFocus"
             itemSize="[360, 250]"
             numColumns="5"
             numRows="3"
@@ -192,7 +193,7 @@
         <!-- Search Results Grid (same position, shows filtered results) -->
         <MarkupGrid
             id="searchResultsGrid"
-            translation="[25, 220]"
+            translation="[25, 235]"
             visible="false"
             itemComponentName="M3UChannelItem"
             itemSize="[360, 250]"

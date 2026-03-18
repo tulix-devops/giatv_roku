@@ -150,20 +150,24 @@ sub onExplicitContentFocusRequested()
 end sub
 
 sub onVisibleChanged()
-    print "DynamicContentScreen.brs - [onVisibleChanged] Visible changed: " + m.top.visible.ToStr()
-    
+    print "DynamicContentScreen.brs - [onVisibleChanged] ========== VISIBILITY CHANGED =========="
+    print "DynamicContentScreen.brs - [onVisibleChanged] Visible: " + m.top.visible.ToStr()
+    print "DynamicContentScreen.brs - [onVisibleChanged] ContentTypeId: " + m.top.contentTypeId.ToStr()
+
     ' When screen becomes visible again (returning from detail screen), restore focus
     if m.top.visible = true
         print "DynamicContentScreen.brs - [onVisibleChanged] Screen became visible, checking if we should restore focus"
-        
+
         ' Set focus on the screen first
         m.top.setFocus(true)
-        
+
         ' Only restore focus if content is loaded and visible
         if m.userChannelsGrid <> invalid and m.userChannelsGrid.visible = true and m.userChannelsGrid.content <> invalid
             ' For grid, restore focus to last item index
-            print "DynamicContentScreen.brs - [onVisibleChanged] Restoring focus to User Channels grid"
+            print "DynamicContentScreen.brs - [onVisibleChanged] User Channels grid is visible, restoring focus"
+            print "DynamicContentScreen.brs - [onVisibleChanged] Grid itemFocused: " + m.userChannelsGrid.itemFocused.ToStr()
             m.userChannelsGrid.setFocus(true)
+            print "DynamicContentScreen.brs - [onVisibleChanged] ✓ Focus restored to User Channels grid"
         else if m.contentRowList <> invalid and m.contentRowList.visible = true and m.contentRowList.content <> invalid
             contentCount = m.contentRowList.content.getChildCount()
             if contentCount > 0 and m.lastFocusedRow >= 0 and m.lastFocusedItem >= 0
@@ -184,11 +188,17 @@ sub onVisibleChanged()
                 m.contentRowList.setFocus(true)
             end if
         end if
+    else
+        print "DynamicContentScreen.brs - [onVisibleChanged] Screen became hidden"
     end if
+    print "DynamicContentScreen.brs - [onVisibleChanged] =========================================="
 end sub
 
 sub onRestoreFocusRequested()
-    print "DynamicContentScreen.brs - [onRestoreFocusRequested] Focus restoration requested"
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] ========== FOCUS RESTORATION TRIGGERED =========="
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] contentTypeId: " + m.top.contentTypeId.ToStr()
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] restoreFocusRequested value: " + m.top.restoreFocusRequested.ToStr()
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] Last focused position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
     
     if m.top.restoreFocusRequested = true
         ' Reset the flag
@@ -200,8 +210,10 @@ sub onRestoreFocusRequested()
             m.userChannelsGrid.setFocus(true)
         else if m.contentRowList <> invalid and m.contentRowList.visible = true and m.contentRowList.content <> invalid
             contentCount = m.contentRowList.content.getChildCount()
+            print "DynamicContentScreen.brs - [onRestoreFocusRequested] RowList has " + contentCount.ToStr() + " rows"
+            
             if contentCount > 0 and m.lastFocusedRow >= 0 and m.lastFocusedItem >= 0
-                print "DynamicContentScreen.brs - [onRestoreFocusRequested] Starting focus restoration timer"
+                print "DynamicContentScreen.brs - [onRestoreFocusRequested] Starting focus restoration timer to position [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
                 
                 ' Create a timer for delayed focus restoration
                 if m.focusRestoreTimer = invalid
@@ -213,38 +225,56 @@ sub onRestoreFocusRequested()
                 m.focusRestoreTimer.control = "start"
             else
                 ' No stored position, just focus the content list
-                print "DynamicContentScreen.brs - [onRestoreFocusRequested] No stored position, focusing content"
-                m.contentRowList.setFocus(true)
-            end if
-        end if
-    end if
-end sub
-
-sub onFocusRestoreTimer()
-    print "DynamicContentScreen.brs - [onFocusRestoreTimer] Restoring focus after delay"
-    
-    if m.contentRowList <> invalid and m.contentRowList.content <> invalid
-        contentCount = m.contentRowList.content.getChildCount()
-        
-        ' Validate the stored position is still valid
-        if m.lastFocusedRow >= 0 and m.lastFocusedRow < contentCount
-            rowContent = m.contentRowList.content.getChild(m.lastFocusedRow)
-            if rowContent <> invalid and m.lastFocusedItem >= 0 and m.lastFocusedItem < rowContent.getChildCount()
-                ' Set focus position using jumpToRowItem
-                m.contentRowList.jumpToRowItem = [m.lastFocusedRow, m.lastFocusedItem]
-                m.contentRowList.setFocus(true)
-                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Focus restored to [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
-            else
-                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored item position invalid, focusing content at [0,0]"
+                print "DynamicContentScreen.brs - [onRestoreFocusRequested] No stored position (row=" + m.lastFocusedRow.ToStr() + ", item=" + m.lastFocusedItem.ToStr() + "), focusing content at [0,0]"
                 m.contentRowList.jumpToRowItem = [0, 0]
                 m.contentRowList.setFocus(true)
             end if
         else
-            print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored row position invalid, focusing content at [0,0]"
+            print "DynamicContentScreen.brs - [onRestoreFocusRequested] RowList not visible or no content"
+        end if
+    end if
+    print "DynamicContentScreen.brs - [onRestoreFocusRequested] =========================================="
+end sub
+
+sub onFocusRestoreTimer()
+    print "DynamicContentScreen.brs - [onFocusRestoreTimer] ========== TIMER FIRED - RESTORING FOCUS =========="
+    print "DynamicContentScreen.brs - [onFocusRestoreTimer] Target position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+
+    if m.contentRowList <> invalid and m.contentRowList.content <> invalid
+        contentCount = m.contentRowList.content.getChildCount()
+        print "DynamicContentScreen.brs - [onFocusRestoreTimer] RowList has " + contentCount.ToStr() + " rows"
+
+        ' Validate the stored position is still valid
+        if m.lastFocusedRow >= 0 and m.lastFocusedRow < contentCount
+            rowContent = m.contentRowList.content.getChild(m.lastFocusedRow)
+            if rowContent <> invalid
+                rowItemCount = rowContent.getChildCount()
+                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Row " + m.lastFocusedRow.ToStr() + " has " + rowItemCount.ToStr() + " items"
+                
+                if m.lastFocusedItem >= 0 and m.lastFocusedItem < rowItemCount
+                    ' Set focus position using jumpToRowItem
+                    m.contentRowList.jumpToRowItem = [m.lastFocusedRow, m.lastFocusedItem]
+                    m.contentRowList.setFocus(true)
+                    print "DynamicContentScreen.brs - [onFocusRestoreTimer] ✓ Focus restored to [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+                else
+                    print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored item position " + m.lastFocusedItem.ToStr() + " invalid (row has " + rowItemCount.ToStr() + " items), focusing row start"
+                    m.contentRowList.jumpToRowItem = [m.lastFocusedRow, 0]
+                    m.contentRowList.setFocus(true)
+                end if
+            else
+                print "DynamicContentScreen.brs - [onFocusRestoreTimer] Row content invalid, focusing [0,0]"
+                m.contentRowList.jumpToRowItem = [0, 0]
+                m.contentRowList.setFocus(true)
+            end if
+        else
+            print "DynamicContentScreen.brs - [onFocusRestoreTimer] Stored row position " + m.lastFocusedRow.ToStr() + " invalid (total rows: " + contentCount.ToStr() + "), focusing [0,0]"
             m.contentRowList.jumpToRowItem = [0, 0]
             m.contentRowList.setFocus(true)
         end if
+    else
+        print "DynamicContentScreen.brs - [onFocusRestoreTimer] RowList or content invalid"
     end if
+    print "DynamicContentScreen.brs - [onFocusRestoreTimer] =========================================="
 end sub
 
 sub updateClockDisplay()
@@ -1092,6 +1122,11 @@ sub onItemSelected()
         rowIndex = m.contentRowList.rowItemSelected[0]
         itemIndex = m.contentRowList.rowItemSelected[1]
         
+        ' IMMEDIATELY store this position for focus restoration (before any navigation)
+        m.lastFocusedRow = rowIndex
+        m.lastFocusedItem = itemIndex
+        print "DynamicContentScreen.brs - [onItemSelected] ✓ STORED FOCUS POSITION: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
+        
         print "DynamicContentScreen.brs - [onItemSelected] Row: " + rowIndex.ToStr() + ", Item: " + itemIndex.ToStr()
         
         ' Get the selected content item
@@ -1133,12 +1168,15 @@ sub onItemSelected()
                     ' Check if this is a Series (typeId = 2 or type = "series")
                     if itemContentType = "series" or itemTypeId = 2
                         print "DynamicContentScreen.brs - [onItemSelected] *** SERIES DETECTED - Navigating to SeasonScreen ***"
-                        
+
                         ' Navigate to SeasonScreen for series content
                         navigateToSeasonScreen(selectedItem)
                         return
                     end if
-                    
+
+                    print "DynamicContentScreen.brs - [onItemSelected] Not a series, checking for DVR or direct playback"
+                    print "DynamicContentScreen.brs - [onItemSelected] Item contentType: '" + itemContentType + "', typeId: " + itemTypeId.ToStr()
+
                     ' Check if this item has DVR content
                     if selectedItem.dvr_url <> invalid and selectedItem.dvr_url <> ""
                         print "DynamicContentScreen.brs - [onItemSelected] DVR content detected, requesting DVR screen"
@@ -1370,18 +1408,7 @@ sub navigateToSeasonScreen(selectedItem as object)
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] Series ID: " + seriesId.ToStr()
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] Type ID: " + typeId.ToStr()
     print "DynamicContentScreen.brs - [navigateToSeasonScreen] Series Title: " + selectedItem.title
-    
-    ' Store current selection for restoration when returning
-    if m.contentRowList <> invalid and m.contentRowList.itemFocused <> invalid
-        itemFocused = m.contentRowList.itemFocused
-        if Type(itemFocused) = "roArray" and itemFocused.Count() >= 2
-            m.lastFocusedRow = itemFocused[0]
-            m.lastFocusedItem = itemFocused[1]
-            print "DynamicContentScreen.brs - [navigateToSeasonScreen] Stored focus position: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
-        else
-            print "DynamicContentScreen.brs - [navigateToSeasonScreen] itemFocused is invalid or not an array"
-        end if
-    end if
+    print "DynamicContentScreen.brs - [navigateToSeasonScreen] Focus position already stored: [" + m.lastFocusedRow.ToStr() + ", " + m.lastFocusedItem.ToStr() + "]"
     
     ' Find the SeasonScreen component
     parentScene = m.top.getParent()
@@ -1692,7 +1719,9 @@ sub processSeriesData(seriesData as object)
         
         m.pendingSeasonScreen.DVRParent = parentNode
         m.pendingSeasonScreen.arrayDVRs = seasonsArray
-        m.pendingSeasonScreen.navigatedFrom = "SERIES"
+        ' Store the actual contentTypeId we're navigating from (13=Home, 2=Series, etc.)
+        m.pendingSeasonScreen.navigatedFrom = m.top.contentTypeId.ToStr()
+        print "DynamicContentScreen.brs - [processSeriesData] Setting navigatedFrom to contentTypeId: " + m.top.contentTypeId.ToStr()
         m.pendingSeasonScreen.visible = true
         m.pendingSeasonScreen.setFocus(true)
         
@@ -1724,7 +1753,9 @@ sub showSeasonScreenWithBasicInfo()
         
         m.pendingSeasonScreen.DVRParent = parentNode
         m.pendingSeasonScreen.arrayDVRs = [seasonEntry]
-        m.pendingSeasonScreen.navigatedFrom = "SERIES"
+        ' Store the actual contentTypeId we're navigating from (13=Home, 2=Series, etc.)
+        m.pendingSeasonScreen.navigatedFrom = m.top.contentTypeId.ToStr()
+        print "DynamicContentScreen.brs - [showSeasonScreenWithBasicInfo] Setting navigatedFrom to contentTypeId: " + m.top.contentTypeId.ToStr()
         m.pendingSeasonScreen.visible = true
         m.pendingSeasonScreen.setFocus(true)
     end if

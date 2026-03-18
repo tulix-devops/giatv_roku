@@ -2063,10 +2063,8 @@ sub restoreNavigationAndContent()
             ' Restore item selection after a short delay to ensure screen is ready
             restorePreviousItemSelection()
         else
-            ' For regular screens, focus navigation bar first
-            if m.dynamicNavBar <> invalid
-                m.dynamicNavBar.setFocus(true)
-            end if
+            ' For regular screens, restore item selection and focus content (like SeasonScreen does)
+            print "HomeScene.brs - [restoreNavigationAndContent] Restoring regular screen - focusing content, not navigation"
             ' Restore item selection after a short delay to ensure screen is ready
             restorePreviousItemSelection()
         end if
@@ -2074,23 +2072,24 @@ sub restoreNavigationAndContent()
         ' Default to home screen
         print "HomeScene.brs - [restoreNavigationAndContent] No valid screen index, defaulting to Home (0)"
         showScreenByIndex(0)
-        if m.dynamicNavBar <> invalid
-            m.dynamicNavBar.setFocus(true)
-        end if
+        ' Don't focus navigation bar - let content screen handle focus
     end if
     
     print "HomeScene.brs - [restoreNavigationAndContent] Navigation and content restoration complete"
 end sub
 
 sub storePreviousItemSelection()
-    print "HomeScene.brs - [storePreviousItemSelection] Storing current item selection"
-    
+    print "HomeScene.brs - [storePreviousItemSelection] ========== STORING ITEM SELECTION =========="
+    print "HomeScene.brs - [storePreviousItemSelection] Current screen index: " + m.currentScreenIndex.ToStr()
+
     ' Get current screen
     if m.currentScreenIndex >= 0 and m.currentScreenIndex < m.dynamicContentScreens.Count()
         screenKey = m.currentScreenIndex.ToStr()
         if m.dynamicContentScreens.DoesExist(screenKey)
             currentScreen = m.dynamicContentScreens[screenKey].screen
             if currentScreen <> invalid
+                print "HomeScene.brs - [storePreviousItemSelection] Current screen found, contentTypeId: " + currentScreen.contentTypeId.ToStr()
+                
                 ' Check if this is a TV Guide screen (has TimeGrid instead of RowList)
                 timeGrid = currentScreen.findNode("timeGrid")
                 if timeGrid <> invalid
@@ -2101,34 +2100,82 @@ sub storePreviousItemSelection()
                         channelFocused: timeGrid.channelFocused,
                         programFocused: timeGrid.programFocused
                     }
-                    print "HomeScene.brs - [storePreviousItemSelection] Stored TV Guide selection - Screen: " + m.currentScreenIndex.ToStr()
+                    print "HomeScene.brs - [storePreviousItemSelection] ✓ Stored TV Guide selection - Screen: " + m.currentScreenIndex.ToStr()
                     print "HomeScene.brs - [storePreviousItemSelection] Channel focused: " + timeGrid.channelFocused.ToStr()
                     print "HomeScene.brs - [storePreviousItemSelection] Program focused: " + timeGrid.programFocused.ToStr()
                 else
-                    ' Get the RowList from the current screen
-                    rowList = currentScreen.findNode("contentRowList")
-                    if rowList <> invalid
-                        ' Store the current selection
+                    ' Check if this is User Channels grid (contentTypeId = 14)
+                    userChannelsGrid = currentScreen.findNode("userChannelsGrid")
+                    if userChannelsGrid <> invalid and currentScreen.contentTypeId = 14
+                        print "HomeScene.brs - [storePreviousItemSelection] User Channels Grid found"
+                        print "HomeScene.brs - [storePreviousItemSelection] itemFocused: " + FormatJson(userChannelsGrid.itemFocused)
+                        print "HomeScene.brs - [storePreviousItemSelection] itemSelected: " + FormatJson(userChannelsGrid.itemSelected)
+                        
+                        ' Use itemSelected if available, otherwise itemFocused
+                        storedItemIndex = userChannelsGrid.itemFocused
+                        if userChannelsGrid.itemSelected <> invalid and userChannelsGrid.itemSelected >= 0
+                            storedItemIndex = userChannelsGrid.itemSelected
+                            print "HomeScene.brs - [storePreviousItemSelection] Using itemSelected for User Channels: " + storedItemIndex.ToStr()
+                        end if
+                        
+                        ' Store the grid selection
                         m.previousItemSelection = {
                             screenIndex: m.currentScreenIndex,
-                            screenType: "rowlist",
-                            itemFocused: rowList.itemFocused,
-                            rowItemFocused: rowList.rowItemFocused
+                            screenType: "userchannelsgrid",
+                            itemFocused: storedItemIndex
                         }
-                        print "HomeScene.brs - [storePreviousItemSelection] Stored RowList selection - Screen: " + m.currentScreenIndex.ToStr()
-                        if rowList.itemFocused <> invalid
-                            print "HomeScene.brs - [storePreviousItemSelection] Item focused: " + FormatJson(rowList.itemFocused)
-                        end if
-                        if rowList.rowItemFocused <> invalid
-                            print "HomeScene.brs - [storePreviousItemSelection] Row item focused: " + FormatJson(rowList.rowItemFocused)
-                        end if
+                        print "HomeScene.brs - [storePreviousItemSelection] ✓ Stored User Channels Grid selection - Screen: " + m.currentScreenIndex.ToStr()
+                        print "HomeScene.brs - [storePreviousItemSelection] Final itemFocused: " + storedItemIndex.ToStr()
                     else
-                        print "HomeScene.brs - [storePreviousItemSelection] No RowList or TimeGrid found in current screen"
+                        ' Get the RowList from the current screen
+                        rowList = currentScreen.findNode("contentRowList")
+                        if rowList <> invalid
+                            print "HomeScene.brs - [storePreviousItemSelection] RowList found, checking selection state"
+                            print "HomeScene.brs - [storePreviousItemSelection] itemFocused: " + FormatJson(rowList.itemFocused)
+                            print "HomeScene.brs - [storePreviousItemSelection] rowItemFocused: " + FormatJson(rowList.rowItemFocused)
+                            print "HomeScene.brs - [storePreviousItemSelection] itemSelected: " + FormatJson(rowList.itemSelected)
+                            print "HomeScene.brs - [storePreviousItemSelection] rowItemSelected: " + FormatJson(rowList.rowItemSelected)
+                            
+                            ' Use itemSelected/rowItemSelected if available (more accurate), otherwise use itemFocused
+                            storedItemFocused = rowList.itemFocused
+                            storedRowItemFocused = rowList.rowItemFocused
+                            
+                            ' Prefer itemSelected over itemFocused for more accurate restoration
+                            if rowList.itemSelected <> invalid and Type(rowList.itemSelected) = "roArray" and rowList.itemSelected.Count() >= 2
+                                storedItemFocused = rowList.itemSelected
+                                print "HomeScene.brs - [storePreviousItemSelection] Using itemSelected for more accurate position"
+                            end if
+                            
+                            if rowList.rowItemSelected <> invalid and Type(rowList.rowItemSelected) = "roArray" and rowList.rowItemSelected.Count() >= 2
+                                storedRowItemFocused = rowList.rowItemSelected
+                                print "HomeScene.brs - [storePreviousItemSelection] Using rowItemSelected for more accurate position"
+                            end if
+                            
+                            ' Store the current selection
+                            m.previousItemSelection = {
+                                screenIndex: m.currentScreenIndex,
+                                screenType: "rowlist",
+                                itemFocused: storedItemFocused,
+                                rowItemFocused: storedRowItemFocused
+                            }
+                            print "HomeScene.brs - [storePreviousItemSelection] ✓ Stored RowList selection - Screen: " + m.currentScreenIndex.ToStr()
+                            print "HomeScene.brs - [storePreviousItemSelection] Final itemFocused: " + FormatJson(storedItemFocused)
+                            print "HomeScene.brs - [storePreviousItemSelection] Final rowItemFocused: " + FormatJson(storedRowItemFocused)
+                        else
+                            print "HomeScene.brs - [storePreviousItemSelection] ERROR: No RowList, Grid, or TimeGrid found in current screen"
+                        end if
                     end if
                 end if
+            else
+                print "HomeScene.brs - [storePreviousItemSelection] ERROR: Current screen is invalid"
             end if
+        else
+            print "HomeScene.brs - [storePreviousItemSelection] ERROR: Screen key not found: " + screenKey
         end if
+    else
+        print "HomeScene.brs - [storePreviousItemSelection] ERROR: Invalid screen index: " + m.currentScreenIndex.ToStr()
     end if
+    print "HomeScene.brs - [storePreviousItemSelection] =========================================="
 end sub
 
 sub restorePreviousItemSelection()
@@ -2180,6 +2227,23 @@ sub onRestoreSelectionTimer()
                         print "HomeScene.brs - [onRestoreSelectionTimer] Focus restored to TV Guide TimeGrid"
                     else
                         print "HomeScene.brs - [onRestoreSelectionTimer] ERROR: TimeGrid not found in TV Guide screen"
+                    end if
+                else if screenType = "userchannelsgrid"
+                    ' Handle User Channels grid
+                    print "HomeScene.brs - [onRestoreSelectionTimer] Restoring User Channels Grid selection"
+                    userChannelsGrid = screen.findNode("userChannelsGrid")
+                    if userChannelsGrid <> invalid
+                        ' Restore item focus
+                        if m.previousItemSelection.itemFocused <> invalid and m.previousItemSelection.itemFocused >= 0
+                            userChannelsGrid.jumpToItem = m.previousItemSelection.itemFocused
+                            print "HomeScene.brs - [onRestoreSelectionTimer] ✓ Restored User Channels Grid to item: " + m.previousItemSelection.itemFocused.ToStr()
+                        end if
+                        
+                        ' Set focus on the grid
+                        userChannelsGrid.setFocus(true)
+                        print "HomeScene.brs - [onRestoreSelectionTimer] ✓ Focus restored to User Channels Grid"
+                    else
+                        print "HomeScene.brs - [onRestoreSelectionTimer] ERROR: User Channels Grid not found"
                     end if
                 else
                     ' Handle regular RowList screens
