@@ -28,12 +28,12 @@
       color="#1e2328" />
 
     <!-- Logo at the top - centered in 240px nav bar -->
-    <Group id="logoGroup" translation="[60, 15]">
+    <Group id="logoGroup" translation="[0, -40]">
       <Poster
         id="logoImage"
-        uri="pkg:/images/img/gia-tv-small.png"
-        width="120"
-        height="120"
+        uri="pkg:/images/png/gia-tv-resized.png"
+        width="240"
+        height="240"
         loadDisplayMode="scaleToFill" />
     </Group>
 

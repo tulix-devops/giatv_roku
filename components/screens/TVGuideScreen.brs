@@ -4,13 +4,19 @@ sub init()
     m.headerTime = m.top.findNode("headerTime")
     m.headerLogo = m.top.findNode("headerLogo")
     m.headerDivider = m.top.findNode("headerDivider")
-    
+
+    ' New header elements (matching dynamic_content_screen)
+    m.screenHeaderGroup = m.top.findNode("screenHeaderGroup")
+    m.screenTabName = m.top.findNode("screenTabName")
+    m.screenTimeLabel = m.top.findNode("screenTimeLabel")
+    m.screenBrandIcon = m.top.findNode("screenBrandIcon")
+
     m.daySelector = m.top.findNode("daySelector")
     m.timeGrid = m.top.findNode("timeGrid")
-    
+
     m.loadingGroup = m.top.findNode("loadingGroup")
     m.noContentLabel = m.top.findNode("noContentLabel")
-    
+
     ' Channel logo and program details
     m.channelLogoImage = m.top.findNode("channelLogoImage")
     m.channelLogoName = m.top.findNode("channelLogoName")
@@ -18,6 +24,16 @@ sub init()
     m.programTitle = m.top.findNode("programTitle")
     m.programTime = m.top.findNode("programTime")
     m.programDescription = m.top.findNode("programDescription")
+    
+    ' Set up clock timer for header
+    m.clockTimer = CreateObject("roSGNode", "Timer")
+    m.clockTimer.duration = 60
+    m.clockTimer.repeat = true
+    m.clockTimer.observeField("fire", "updateClockDisplay")
+    
+    ' Update clock immediately and start timer
+    updateClockDisplay()
+    m.clockTimer.control = "start"
     
     ' Video player
     m.videoPlayer = m.top.findNode("videoPlayer")
@@ -55,6 +71,7 @@ sub init()
     m.programDetailsGroup = m.top.findNode("programDetailsGroup")
     m.videoPlayerGroup = m.top.findNode("videoPlayerGroup")
     m.channelLogoGroup = m.top.findNode("channelLogoGroup")
+    m.backHintGroup = m.top.findNode("backHintGroup")
     
     ' Track animation state
     m.isDetailViewOpen = false
@@ -260,13 +277,16 @@ sub onVisibleChanged()
 end sub
 
 sub onExplicitFocusRequested()
+    print "TVGuideScreen.brs - [onExplicitFocusRequested] Explicit focus requested"
     if m.top.explicitContentFocusRequested > 0
         if m.timeGrid <> invalid
             m.timeGridHasBeenFocused = true
             m.focusArea = "timegrid"
             m.timeGrid.setFocus(true)
-            
+            print "TVGuideScreen.brs - [onExplicitFocusRequested] TimeGrid focused"
+
             if m.isDetailViewOpen = false and m.isClosingDetailView = false
+                print "TVGuideScreen.brs - [onExplicitFocusRequested] Triggering layout transition"
                 triggerLayoutTransition()
             end if
         end if
@@ -293,7 +313,12 @@ sub onProgramFocused()
     channelIndex = m.timeGrid.channelFocused
     programIndex = m.timeGrid.programFocused
     
+    print "TVGuideScreen.brs - [onProgramFocused] =========================================="
+    print "TVGuideScreen.brs - [onProgramFocused] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
+    print "TVGuideScreen.brs - [onProgramFocused] isDetailViewOpen: " + m.isDetailViewOpen.ToStr()
+    
     if channelIndex = invalid or programIndex = invalid or programIndex < 0
+        print "TVGuideScreen.brs - [onProgramFocused] Invalid indices, stopping video"
         if m.videoPlayer <> invalid
             m.videoPlayer.control = "stop"
         end if
@@ -304,15 +329,22 @@ sub onProgramFocused()
         return
     end if
     
-    if channelIndex <> invalid and programIndex <> invalid
-        if m.isDetailViewOpen = true
-            updateFocusedItemDetails(channelIndex, programIndex)
-        end if
+    ' Always update details when program focus changes and detail view is open
+    if m.isDetailViewOpen = true
+        print "TVGuideScreen.brs - [onProgramFocused] Detail view open, updating details"
+        updateFocusedItemDetails(channelIndex, programIndex)
     end if
 end sub
 
 sub triggerLayoutTransition()
+    print "TVGuideScreen.brs - [triggerLayoutTransition] Opening detail view"
     m.isDetailViewOpen = true
+    
+    ' Manually adjust TimeGrid numRows for detail view (height animated)
+    if m.timeGrid <> invalid
+        m.timeGrid.numRows = 5
+        print "TVGuideScreen.brs - [triggerLayoutTransition] TimeGrid set to 5 rows"
+    end if
     
     if m.timeGridMoveDownAnimation <> invalid
         m.timeGridMoveDownAnimation.control = "start"
@@ -347,14 +379,46 @@ sub triggerLayoutTransition()
             m.channelLogoGroup.opacity = 1.0
         end if
     end if
+    
+    ' Make back hint visible with fade-in
+    if m.backHintGroup <> invalid
+        m.backHintGroup.visible = true
+        m.backHintGroup.opacity = 1.0
+    end if
+    
+    ' Wait a moment for TimeGrid focus to stabilize, then update details
+    m.detailUpdateTimer = CreateObject("roSGNode", "Timer")
+    m.detailUpdateTimer.duration = 0.15
+    m.detailUpdateTimer.repeat = false
+    m.detailUpdateTimer.observeField("fire", "onInitialDetailUpdate")
+    m.detailUpdateTimer.control = "start"
+end sub
+
+sub onInitialDetailUpdate()
+    print "TVGuideScreen.brs - [onInitialDetailUpdate] Updating details after layout transition"
+    if m.timeGrid <> invalid
+        channelIndex = m.timeGrid.channelFocused
+        programIndex = m.timeGrid.programFocused
+        print "TVGuideScreen.brs - [onInitialDetailUpdate] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
+        if channelIndex <> invalid and programIndex <> invalid and programIndex >= 0
+            updateFocusedItemDetails(channelIndex, programIndex)
+        end if
+    end if
 end sub
 
 sub closeDetailView()
+    print "TVGuideScreen.brs - [closeDetailView] Closing detail view"
     m.isClosingDetailView = true
     m.isDetailViewOpen = false
     
     if m.videoPlayer <> invalid
         m.videoPlayer.control = "stop"
+    end if
+    
+    ' Manually restore TimeGrid numRows (height animated)
+    if m.timeGrid <> invalid
+        m.timeGrid.numRows = 12
+        print "TVGuideScreen.brs - [closeDetailView] TimeGrid restored to 12 rows"
     end if
     
     if m.programDetailsFadeOutAnimation <> invalid
@@ -367,6 +431,12 @@ sub closeDetailView()
     
     if m.channelLogoFadeOutAnimation <> invalid
         m.channelLogoFadeOutAnimation.control = "start"
+    end if
+    
+    ' Hide back hint group
+    if m.backHintGroup <> invalid
+        m.backHintGroup.visible = false
+        m.backHintGroup.opacity = 0.0
     end if
     
     if m.timeGridMoveUpAnimation <> invalid
@@ -389,31 +459,59 @@ sub onCloseAnimationComplete()
         m.programDetailsGroup.visible = false
         m.programDetailsGroup.opacity = 0.0
     end if
-    
+
     if m.videoPlayerGroup <> invalid
         m.videoPlayerGroup.visible = false
         m.videoPlayerGroup.opacity = 0.0
     end if
-    
+
     if m.channelLogoGroup <> invalid
         m.channelLogoGroup.visible = false
         m.channelLogoGroup.opacity = 0.0
+    end if
+    
+    if m.backHintGroup <> invalid
+        m.backHintGroup.visible = false
+        m.backHintGroup.opacity = 0.0
+    end if
+    
+    if m.backHintGroup <> invalid
+        m.backHintGroup.visible = false
+        m.backHintGroup.opacity = 0.0
     end if
     
     m.isClosingDetailView = false
 end sub
 
 sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] ========== UPDATING DETAILS =========="
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Channel index: " + channelIndex.ToStr()
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Program index: " + programIndex.ToStr()
+    
     ' Update channel logo and program details
     content = m.timeGrid.content
-    if content = invalid then return
-    
+    if content = invalid
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: TimeGrid content is invalid"
+        return
+    end if
+
     channelNode = content.GetChild(channelIndex)
-    if channelNode = invalid then return
+    if channelNode = invalid
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: Channel node is invalid at index " + channelIndex.ToStr()
+        return
+    end if
     
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Channel title: " + channelNode.title
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Channel has " + channelNode.getChildCount().ToStr() + " programs"
+
     program = channelNode.GetChild(programIndex)
-    if program = invalid then return
+    if program = invalid
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: Program is invalid at index " + programIndex.ToStr()
+        return
+    end if
     
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Program title: " + program.title
+
     ' Get original channel data from m.channelsData for stream URL
     originalChannel = invalid
     originalProgram = invalid
@@ -422,6 +520,9 @@ sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
         ' Also get the original program data which may have a stream URL
         if originalChannel.shows <> invalid and programIndex >= 0 and programIndex < originalChannel.shows.Count()
             originalProgram = originalChannel.shows[programIndex]
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Found original program data"
+        else
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Original program data not found"
         end if
     end if
     
@@ -462,9 +563,13 @@ sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
     if m.programTitle <> invalid
         if program.title <> invalid and program.title <> ""
             m.programTitle.text = program.title
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programTitle.text to: " + program.title
         else
             m.programTitle.text = "No Title"
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programTitle.text to: No Title"
         end if
+    else
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: m.programTitle is invalid"
     end if
     
     ' Update program time (start - end)
@@ -474,6 +579,9 @@ sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
         playDurationTime = program.PLAYDURATION
         if playStartTime = invalid then playStartTime = program.playStart
         if playDurationTime = invalid then playDurationTime = program.playDuration
+        
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] playStartTime: " + playStartTime.ToStr()
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] playDurationTime: " + playDurationTime.ToStr()
         
         if playStartTime <> invalid and playDurationTime <> invalid
             ' Format start time
@@ -511,18 +619,26 @@ sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
             timeText = timeText + endMin.ToStr() + " " + endAMPM
             
             m.programTime.text = timeText
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programTime.text to: " + timeText
         else
             m.programTime.text = ""
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programTime.text to empty (invalid times)"
         end if
+    else
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: m.programTime is invalid"
     end if
     
     ' Update program description
     if m.programDescription <> invalid
         if program.description <> invalid and program.description <> ""
             m.programDescription.text = program.description
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programDescription.text (length: " + Len(program.description).ToStr() + ")"
         else
             m.programDescription.text = "No description available"
+            print "TVGuideScreen.brs - [updateFocusedItemDetails] Set programDescription.text to: No description available"
         end if
+    else
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: m.programDescription is invalid"
     end if
     
     ' Log program status
@@ -606,12 +722,17 @@ end sub
 sub onProgramSelected()
     if m.timeGrid = invalid then return
     
+    print "TVGuideScreen.brs - [onProgramSelected] =========================================="
+    print "TVGuideScreen.brs - [onProgramSelected] Program selected"
+    
     if m.videoPlayer <> invalid
         m.videoPlayer.control = "stop"
     end if
     
     channelIndex = m.timeGrid.channelSelected
     programIndex = m.timeGrid.programSelected
+    
+    print "TVGuideScreen.brs - [onProgramSelected] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
     
     if channelIndex <> invalid and programIndex <> invalid
         content = m.timeGrid.content
@@ -718,19 +839,29 @@ sub onVideoStateChanged()
 end sub
 
 sub returnFocusToNavigation()
+    print "TVGuideScreen.brs - [returnFocusToNavigation] Returning to navigation"
     m.timeGridHasBeenFocused = false
     m.isDetailViewOpen = false
     m.isClosingDetailView = false
-    
+
     if m.videoPlayer <> invalid
         m.videoPlayer.control = "stop"
     end if
-    
+
+    ' Reset TimeGrid to initial state with header visible (12 rows at y=175)
     if m.timeGrid <> invalid
-        m.timeGrid.translation = [0, 0]
-        m.timeGrid.numRows = 14
+        m.timeGrid.translation = [0, 175]
+        m.timeGrid.height = 905
+        m.timeGrid.numRows = 12
+        print "TVGuideScreen.brs - [returnFocusToNavigation] TimeGrid reset to 12 rows at [0, 175]"
     end if
     
+    ' Ensure header is visible
+    if m.screenHeaderGroup <> invalid
+        m.screenHeaderGroup.visible = true
+        print "TVGuideScreen.brs - [returnFocusToNavigation] Header made visible"
+    end if
+
     if m.programDetailsGroup <> invalid
         m.programDetailsGroup.visible = false
         m.programDetailsGroup.opacity = 0.0
@@ -1662,3 +1793,26 @@ function convertTo12HourFormat(time24 as string) as string
     
     return displayHour.ToStr() + ":" + minuteStr + " " + ampm
 end function
+
+sub updateClockDisplay()
+    ' Get current local time and format as HH:MM
+    dateTime = CreateObject("roDateTime")
+    dateTime.ToLocalTime()
+    
+    hours = dateTime.GetHours()
+    minutes = dateTime.GetMinutes()
+    
+    ' Format with leading zeros
+    hoursStr = hours.ToStr()
+    if hours < 10 then hoursStr = "0" + hoursStr
+    
+    minutesStr = minutes.ToStr()
+    if minutes < 10 then minutesStr = "0" + minutesStr
+    
+    timeStr = hoursStr + ":" + minutesStr
+    
+    ' Update the header time label
+    if m.screenTimeLabel <> invalid
+        m.screenTimeLabel.text = timeStr
+    end if
+end sub

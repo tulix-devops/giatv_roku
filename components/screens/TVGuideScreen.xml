@@ -10,43 +10,95 @@
     <script type="text/brightscript" uri="pkg:/components/screens/TVGuideScreen.brs" />
 
     <children>
-        <!-- Background -->
+        <!-- Background (matching dynamic_content_screen) -->
         <Rectangle 
             id="background" 
             width="1920" 
             height="1080" 
-            color="#0D1B2A" />
+            color="#0f1419" />
 
-        <!-- TOP LEFT: Back Navigation Hint -->
-        <Label id="backHint" 
-               text="Press BACK for Navigation"
-               translation="[40, 30]"
-               width="400"
-               height="20"
-               font="font:SmallSystemFont"
-               color="#4FC3F7"
-               horizAlign="left"
-               vertAlign="center" />
+        <!-- Screen Header with Tab Name and Branding (matching dynamic_content_screen exactly) -->
+        <Group id="screenHeaderGroup" translation="[25, 15]" visible="true">
+            <!-- Left side: Tab Name • Timestamp -->
+            <Group id="headerLeftGroup" translation="[0, 0]">
+                <!-- Tab Name -->
+                <Label
+                    id="screenTabName"
+                    text="TV Guide"
+                    color="#ffffff"
+                    font="font:UrbanistBold"
+                    horizAlign="left"
+                    vertAlign="center"
+                    translation="[0, 42]"
+                    height="36">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32" />
+                </Label>
 
-        <!-- TOP LEFT: Current Channel Logo (Smaller) - Initially hidden -->
-        <Group id="channelLogoGroup" translation="[40, 80]" visible="false" opacity="0.0">
+                <!-- Dot Separator (blue color matching dynamic_content_screen) -->
+                <Label
+                    id="screenDotSeparator"
+                    text="•"
+                    color="#6366f1"
+                    font="font:UrbanistBold"
+                    horizAlign="center"
+                    vertAlign="center"
+                    translation="[145, 42]"
+                    width="20"
+                    height="36">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32" />
+                </Label>
+
+                <!-- Local Time Display -->
+                <Label
+                    id="screenTimeLabel"
+                    text="00:00"
+                    color="#ffffff"
+                    font="font:UrbanistMedium"
+                    horizAlign="left"
+                    vertAlign="center"
+                    translation="[165, 44]"
+                    height="32">
+                    <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26" />
+                </Label>
+            </Group>
+
+            <!-- Right side: GiaTV Logo (120x120) -->
+            <Poster
+                id="screenBrandIcon"
+                uri="pkg:/images/img/gia-tv-small.png"
+                width="120"
+                height="120"
+                translation="[1710, 0]"
+                loadDisplayMode="scaleToFit" />
+
+            <!-- Header Divider Line (matching dynamic_content_screen color) -->
+            <Rectangle
+                id="headerDivider"
+                width="1850"
+                height="2"
+                color="0x3A4A6AFF"
+                translation="[0, 125]" />
+        </Group>
+
+        <!-- TOP LEFT: Current Channel Logo (Smaller) - Initially hidden, moved down for header -->
+        <Group id="channelLogoGroup" translation="[40, 150]" visible="false" opacity="0.0">
             <Rectangle id="channelLogoBg" 
-                       width="320" 
-                       height="180" 
+                       width="280" 
+                       height="160" 
                        color="#1F3B5C"
                        opacity="0.5" />
             <Poster id="channelLogoImage"
                     uri=""
                     translation="[0, 0]"
-                    width="320"
-                    height="180"
+                    width="280"
+                    height="160"
                     loadingBitmapUri=""
                     failedBitmapUri="" />
             <Label id="channelLogoName"
                    text=""
                    translation="[0, 0]"
-                   width="240"
-                   height="135"
+                   width="280"
+                   height="160"
                    font="font:SmallBoldSystemFont"
                    color="#FFFFFF"
                    horizAlign="center"
@@ -54,69 +106,95 @@
                    visible="false" />
         </Group>
         
-        <!-- PROGRAM DETAILS: Smaller container - Initially hidden -->
-        <Group id="programDetailsGroup" translation="[40, 280]" visible="false" opacity="0.0">
+        <!-- PROGRAM DETAILS: Wider container, shorter height - Initially hidden, moved down for header -->
+        <Group id="programDetailsGroup" translation="[40, 340]" visible="false" opacity="0.0">
             <Rectangle id="detailsBg" 
-                       width="400" 
-                       height="340" 
+                       width="560" 
+                       height="210" 
                        color="#1F3B5C"
                        opacity="0.5" />
             
             <!-- Current Timestamp (at the top) -->
             <Label id="currentTimestamp" 
                    text="00:00 AM"
-                   translation="[20, 15]"
-                   width="360"
-                   height="25"
-                   font="font:SmallBoldSystemFont"
+                   translation="[15, 10]"
+                   width="530"
+                   height="20"
                    color="#4FC3F7"
                    horizAlign="left"
-                   vertAlign="center" />
+                   vertAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24" />
+            </Label>
             
             <Label id="programTitle" 
                    text=""
-                   translation="[20, 50]"
-                   width="360"
-                   height="90"
-                   font="font:MediumBoldSystemFont"
+                   translation="[15, 38]"
+                   width="530"
+                   height="55"
                    color="#FFFFFF"
                    horizAlign="left"
                    vertAlign="top"
                    wrap="true"
-                   maxLines="3" />
+                   maxLines="2">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="25" />
+            </Label>
+            
             <Label id="programTime" 
                    text=""
-                   translation="[20, 150]"
-                   width="360"
-                   height="30"
-                   font="font:SmallSystemFont"
+                   translation="[15, 100]"
+                   width="530"
+                   height="25"
                    color="#B0B8C4"
                    horizAlign="left"
-                   vertAlign="center" />
+                   vertAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20" />
+            </Label>
+            
             <Label id="programDescription" 
                    text=""
-                   translation="[20, 190]"
-                   width="360"
-                   height="150"
-                   font="font:TinySystemFont"
+                   translation="[15, 130]"
+                   width="530"
+                   height="70"
                    color="#B0B8C4"
                    horizAlign="left"
                    vertAlign="top"
                    wrap="true"
-                   maxLines="5" />
+                   maxLines="3">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20" />
+            </Label>
         </Group>
 
-        <!-- VIDEO PLAYER: Right side - Initially hidden -->
-        <Group id="videoPlayerGroup" translation="[480, 0]" visible="false" opacity="0.0">
+        <!-- BACK NAVIGATION HINT: Separate container below program details -->
+        <Group id="backHintGroup" translation="[40, 550]" visible="false" opacity="0.0">
+            <Rectangle id="backHintBg" 
+                       width="560" 
+                       height="50" 
+                       color="#1F3B5C"
+                       opacity="0.5" />
+            
+            <Label id="backHint" 
+                   text="Press BACK for Navigation"
+                   translation="[15, 15]"
+                   width="530"
+                   height="20"
+                   color="#4FC3F7"
+                   horizAlign="left"
+                   vertAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="28" />
+            </Label>
+        </Group>
+
+        <!-- VIDEO PLAYER: Right side - Narrower width - Initially hidden, moved down and reduced height for header -->
+        <Group id="videoPlayerGroup" translation="[670, 150]" visible="false" opacity="0.0">
             <Rectangle id="videoPlayerBg" 
-                       width="1440" 
-                       height="680" 
+                       width="1200" 
+                       height="480" 
                        color="#000000"
                        opacity="1.0" />
             <Video id="videoPlayer"
                    translation="[0, 0]"
-                   width="1440"
-                   height="680"
+                   width="1200"
+                   height="480"
                    visible="true"
                    loop="false"
                    control="stop"
@@ -124,8 +202,8 @@
             <Label id="videoPlayerStatus"
                    text=""
                    translation="[0, 0]"
-                   width="1440"
-                   height="680"
+                   width="1200"
+                   height="480"
                    font="font:MediumSystemFont"
                    color="#FFFFFF"
                    horizAlign="center"
@@ -133,16 +211,16 @@
                    visible="false" />
         </Group>
 
-        <!-- TV GUIDE GRID (TimeGrid Component) - Initially full-screen, animates down when program focused -->
+        <!-- TV GUIDE GRID (TimeGrid Component) - Moved down for header, reduced to 12 rows -->
         <TimeGrid
             id="timeGrid"
-            translation="[0, 0]"
+            translation="[0, 175]"
             width="1920"
-            height="1080"
+            height="905"
             visible="true"
             focusable="true"
             channelInfoComponentName="EPGChannelItem"
-            numRows="14"
+            numRows="12"
             fillProgramGaps="true"
             showPastTimeScreen="false"
             duration="9000"
@@ -153,7 +231,7 @@
             timeBarHeight="40"
             timeBarTextColor="#FFFFFF"
             timeBarBackgroundColor="#1F3B5C"
-            gridBackgroundColor="#0D1B2A"
+            gridBackgroundColor="#0f1419"
             channelInfoBackgroundColor="#1F3B5C"
             channelNoDataText=""
             loadingDataText="TV Guide Loading..."
@@ -169,18 +247,13 @@
             <Vector2DFieldInterpolator 
                 id="timeGridTranslationDownInterp"
                 key="[0.0, 1.0]"
-                keyValue="[[0, 0], [0, 680]]"
+                keyValue="[[0, 175], [0, 680]]"
                 fieldToInterp="timeGrid.translation" />
             <Vector2DFieldInterpolator 
-                id="timeGridSizeDownInterp"
+                id="timeGridHeightDownInterp"
                 key="[0.0, 1.0]"
-                keyValue="[[1920, 1080], [1920, 400]]"
-                fieldToInterp="timeGrid.size" />
-            <FloatFieldInterpolator 
-                id="timeGridNumRowsDownInterp"
-                key="[0.0, 1.0]"
-                keyValue="[14, 5]"
-                fieldToInterp="timeGrid.numRows" />
+                keyValue="[[1920, 905], [1920, 400]]"
+                fieldToInterp="timeGrid.height" />
         </Animation>
 
         <!-- Animation to move TimeGrid up and expand it (closing detail view) -->
@@ -188,18 +261,13 @@
             <Vector2DFieldInterpolator 
                 id="timeGridTranslationUpInterp"
                 key="[0.0, 1.0]"
-                keyValue="[[0, 680], [0, 0]]"
+                keyValue="[[0, 680], [0, 175]]"
                 fieldToInterp="timeGrid.translation" />
             <Vector2DFieldInterpolator 
-                id="timeGridSizeUpInterp"
+                id="timeGridHeightUpInterp"
                 key="[0.0, 1.0]"
-                keyValue="[[1920, 400], [1920, 1080]]"
-                fieldToInterp="timeGrid.size" />
-            <FloatFieldInterpolator 
-                id="timeGridNumRowsUpInterp"
-                key="[0.0, 1.0]"
-                keyValue="[5, 14]"
-                fieldToInterp="timeGrid.numRows" />
+                keyValue="[[1920, 400], [1920, 905]]"
+                fieldToInterp="timeGrid.height" />
         </Animation>
 
         <!-- Fade in animations for detail groups -->

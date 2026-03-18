@@ -658,10 +658,10 @@ sub createDynamicNavItem(navItem as object, yPosition as integer, index as integ
     navLabel.text = displayTitle
     navLabel.color = "#ffffff"
     navLabel.font = "font:UrbanistMedium"
-    navLabel.translation = [0, 0]  ' Align with focus indicator
+    navLabel.translation = [20, 0]  ' Left padding of 20px
     navLabel.width = 210  ' Same width as focus indicator (wider for "Age Restricted")
     navLabel.height = 60  ' Same height as focus indicator
-    navLabel.horizAlign = "center"
+    navLabel.horizAlign = "left"
     navLabel.vertAlign = "center"
     
     ' Set font
