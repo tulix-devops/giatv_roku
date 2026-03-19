@@ -19,7 +19,8 @@ sub init()
     m.selectedSeasonIndex = 0
     m.selectedDVRTime = ""
     m.lastFocusedItem = 0
-    
+    m.lastFocusedEpisode = [0, 0]
+
     ' Set up observers
     m.top.observeField("visible", "onVisibleChange")
     
@@ -334,9 +335,32 @@ end sub
 ' =============================================================================
 sub onVisibleChange()
     print "SeasonScreen.brs - [onVisibleChange] visible = " + m.top.visible.ToStr()
-    
+
     if m.top.visible
         ' Set focus to season list when screen becomes visible
+        if m.seasonLabelList <> invalid
+            m.seasonLabelList.setFocus(true)
+        end if
+    end if
+end sub
+
+sub onRestoreFocusRequested()
+    print "SeasonScreen.brs - [onRestoreFocusRequested] Restoring focus to episode grid"
+    
+    if m.episodeGrid <> invalid and m.lastFocusedEpisode <> invalid
+        ' Restore focus to the episode grid
+        m.episodeGrid.setFocus(true)
+        
+        ' Restore the focused item position
+        if Type(m.lastFocusedEpisode) = "roArray" and m.lastFocusedEpisode.Count() >= 2
+            m.episodeGrid.jumpToItem = m.lastFocusedEpisode[1]
+            print "SeasonScreen.brs - [onRestoreFocusRequested] Restored episode focus to: " + FormatJson(m.lastFocusedEpisode)
+        else if Type(m.lastFocusedEpisode) = "roInt" or Type(m.lastFocusedEpisode) = "roInteger"
+            m.episodeGrid.jumpToItem = m.lastFocusedEpisode
+            print "SeasonScreen.brs - [onRestoreFocusRequested] Restored episode focus to index: " + m.lastFocusedEpisode.ToStr()
+        end if
+    else
+        print "SeasonScreen.brs - [onRestoreFocusRequested] No stored focus position, focusing season list"
         if m.seasonLabelList <> invalid
             m.seasonLabelList.setFocus(true)
         end if
@@ -369,7 +393,14 @@ end function
 ' navigateToPlayVideo - Play the selected episode
 ' =============================================================================
 sub navigateToPlayVideo()
-    m.DVRVideoPlayerScreen = m.global.findNode("videoDVRScreen")
+    print "SeasonScreen.brs - [navigateToPlayVideo] =========================================="
+    
+    ' Store current focus position before playing video
+    if m.episodeGrid <> invalid and m.episodeGrid.itemFocused <> invalid
+        m.lastFocusedEpisode = m.episodeGrid.itemFocused
+        print "SeasonScreen.brs - [navigateToPlayVideo] Stored episode focus: " + FormatJson(m.lastFocusedEpisode)
+    end if
+    
     selectionData = getActiveEntityDetails()
     
     if selectionData = invalid or selectionData.data = invalid
@@ -385,9 +416,6 @@ sub navigateToPlayVideo()
         return
     end if
     
-    progNodeToPlay = CreateObject("roSGNode", "ContentNode")
-    progNodeToPlay.url = encodeUrl(episodeData.sources.primary)
-    
     ' Build title
     seriesTitle = ""
     if m.top.DVRParent <> invalid and m.top.DVRParent.title <> invalid
@@ -399,33 +427,36 @@ sub navigateToPlayVideo()
         episodeNum = episodeData.episode.ToStr()
     end if
     
-    progNodeToPlay.title = seriesTitle + " - Season " + m.selectedDVRTime + " Episode " + episodeNum
+    episodeTitle = seriesTitle + " - Season " + m.selectedDVRTime + " Episode " + episodeNum
     
-    ' Set description
-    if episodeData.description <> invalid
-        progNodeToPlay.description = episodeData.description
-    else
-        progNodeToPlay.description = ""
+    ' Get description
+    episodeDescription = ""
+    if episodeData.description <> invalid and episodeData.description <> ""
+        episodeDescription = episodeData.description
     end if
     
-    ' Set poster
+    ' Get thumbnail
+    episodeThumbnail = ""
     if episodeData.images <> invalid and episodeData.images.thumbnail <> invalid
-        progNodeToPlay.hdposterurl = encodeUrl(episodeData.images.thumbnail)
+        episodeThumbnail = episodeData.images.thumbnail
     end if
     
-    progNodeToPlay.addFields({
-        isCC: "false",
-        isHD: "true",
-        channelTitle: "JoyGo"
-    })
+    ' Create video data for home scene video player
+    videoData = {
+        contentUrl: episodeData.sources.primary,
+        title: episodeTitle,
+        description: episodeDescription,
+        thumbnail: episodeThumbnail,
+        isLive: false
+    }
     
-    if m.DVRVideoPlayerScreen <> invalid
-        m.DVRVideoPlayerScreen.navigatedFrom = "Seasons"
-        m.DVRVideoPlayerScreen.content = progNodeToPlay
-        m.DVRVideoPlayerScreen.setFocus(true)
-        m.DVRVideoPlayerScreen.visible = true
-        m.top.visible = false
-    end if
+    print "SeasonScreen.brs - [navigateToPlayVideo] Sending video play request to home scene"
+    print "SeasonScreen.brs - [navigateToPlayVideo] Title: " + episodeTitle
+    print "SeasonScreen.brs - [navigateToPlayVideo] URL: " + episodeData.sources.primary
+    
+    ' Trigger video play request to parent (home scene)
+    m.top.videoPlayRequested = videoData
+    print "SeasonScreen.brs - [navigateToPlayVideo] =========================================="
 end sub
 
 ' =============================================================================

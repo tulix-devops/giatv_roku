@@ -9,6 +9,8 @@
         <field id="itemFocused" type="intarray" alias="episodeGrid.itemFocused" onChange="onEpisodeFocused"/>
         <field id="focusedContent" type="node"/>
         <field id="numBadRequests" type="integer"/>
+        <field id="videoPlayRequested" type="assocarray" />
+        <field id="restoreFocusRequested" type="int" value="0" onChange="onRestoreFocusRequested" />
     </interface>
     
     <script type="text/brightscript" uri="pkg:/components/screens/season_screen/SeasonScreen.brs" />

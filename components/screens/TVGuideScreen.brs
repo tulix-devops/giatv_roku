@@ -1026,7 +1026,7 @@ sub buildTimeGridContent()
     
     m.timeGrid.contentStartTime = startOfDaySeconds
     m.timeGrid.duration = 9000
-    m.timeGrid.maxDays = 4
+    m.timeGrid.maxDays = 1
     
     targetTime = startOfDaySeconds
     if m.dayOffset = 0 then

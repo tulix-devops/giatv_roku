@@ -11,6 +11,7 @@ function init()
     ' Initialize video player management
     m.videoPlayerScreen = invalid
     m.isVideoPlayerVisible = false
+    m.isProcessingVideoBackButton = false
     m.previousScreenIndex = -1
     m.previousItemSelection = invalid
     
@@ -26,6 +27,15 @@ function init()
     ' Initialize screen references
     m.dynamicScreensContainer = m.top.findNode("dynamicScreensContainer")
     m.homeBannerGroup = m.top.findNode("homeBannerGroup")
+    m.seasonScreen = m.top.findNode("SeasonScreen")
+    
+    ' Set up SeasonScreen video play observer
+    if m.seasonScreen <> invalid
+        m.seasonScreen.observeField("videoPlayRequested", "onVideoPlayRequested")
+        print "HomeScene.brs - [init] SeasonScreen video play observer set up"
+    else
+        print "HomeScene.brs - [init] ERROR: SeasonScreen not found!"
+    end if
     
     ' Debug banner initialization
     if m.homeBannerGroup <> invalid
@@ -1391,6 +1401,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
                     return true
                 end if
             end if
+        else if key = "up" or key = "down"
+            ' Block up/down keys when video player is visible
+            print "HomeScene.brs - [onKeyEvent] Blocking " + key + " key while video player is visible"
+            return true
         else
             ' Let video player handle other keys (seeking, etc.)
             if m.videoPlayerScreen <> invalid
@@ -1849,6 +1863,13 @@ end sub
 sub showVideoPlayer(videoData as object)
     print "HomeScene.brs - [showVideoPlayer] Showing video player for: " + videoData.title
     
+    ' Check if we're coming from SeasonScreen
+    m.returnToSeasonScreen = false
+    if m.seasonScreen <> invalid and m.seasonScreen.visible = true
+        m.returnToSeasonScreen = true
+        print "HomeScene.brs - [showVideoPlayer] Coming from SeasonScreen, will return there on back"
+    end if
+    
     ' Store current screen and selection state for restoration
     m.previousScreenIndex = m.currentScreenIndex
     storePreviousItemSelection()
@@ -1953,7 +1974,7 @@ end sub
 
 sub hideVideoPlayer()
     print "HomeScene.brs - [hideVideoPlayer] Hiding video player"
-    
+
     if m.videoPlayerScreen <> invalid
         ' Stop video playback
         videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
@@ -1961,20 +1982,42 @@ sub hideVideoPlayer()
             videoPlayerNode.control = "stop"
             print "HomeScene.brs - [hideVideoPlayer] Video playback stopped"
         end if
-        
+
         ' Restore UI elements (in case they were hidden)
         restoreVideoPlayerUIElements()
-        
+
         ' Hide the video player screen
         m.videoPlayerScreen.visible = false
         m.videoPlayerScreen.setFocus(false)
     end if
-    
+
     m.isVideoPlayerVisible = false
-    
-    ' Restore navigation and content
-    restoreNavigationAndContent()
-    
+    m.isProcessingVideoBackButton = false
+
+    ' Check if we need to return to SeasonScreen
+    if m.returnToSeasonScreen = true
+        print "HomeScene.brs - [hideVideoPlayer] Returning to SeasonScreen"
+        
+        ' Restore navigation
+        if m.dynamicNavBar <> invalid
+            m.dynamicNavBar.visible = true
+        end if
+        
+        ' Show SeasonScreen
+        if m.seasonScreen <> invalid
+            m.seasonScreen.visible = true
+            
+            ' Trigger focus restoration on the episode grid
+            m.seasonScreen.restoreFocusRequested = m.seasonScreen.restoreFocusRequested + 1
+            print "HomeScene.brs - [hideVideoPlayer] SeasonScreen restored, focus restoration triggered"
+        end if
+        
+        m.returnToSeasonScreen = false
+    else
+        ' Restore navigation and content normally
+        restoreNavigationAndContent()
+    end if
+
     print "HomeScene.brs - [hideVideoPlayer] Video player hidden and content restored"
 end sub
 
@@ -2004,6 +2047,12 @@ sub hideAllScreensForVideo()
     ' Hide DVR screen
     if m.dvrScreen <> invalid
         m.dvrScreen.visible = false
+    end if
+    
+    ' Hide season screen
+    if m.seasonScreen <> invalid
+        m.seasonScreen.visible = false
+        print "HomeScene.brs - [hideAllScreensForVideo] Hidden SeasonScreen"
     end if
     
     ' Hide navigation
@@ -2499,11 +2548,30 @@ sub onVideoPlayerNavigationAttempt()
 end sub
 
 sub onVideoPlayerBackButton()
+    print "HomeScene.brs - [onVideoPlayerBackButton] =========================================="
     print "HomeScene.brs - [onVideoPlayerBackButton] Back button detected in video player"
+    print "HomeScene.brs - [onVideoPlayerBackButton] m.isVideoPlayerVisible: " + m.isVideoPlayerVisible.ToStr()
+    print "HomeScene.brs - [onVideoPlayerBackButton] m.isProcessingVideoBackButton: " + m.isProcessingVideoBackButton.ToStr()
+
+    ' Guard against multiple calls
+    if m.isProcessingVideoBackButton = true
+        print "HomeScene.brs - [onVideoPlayerBackButton] Already processing back button, ignoring"
+        return
+    end if
+
+    ' Check if video player screen exists and is visible
+    videoPlayerVisible = false
+    if m.videoPlayerScreen <> invalid and m.videoPlayerScreen.visible = true
+        videoPlayerVisible = true
+    end if
     
-    if m.isVideoPlayerVisible = true
+    print "HomeScene.brs - [onVideoPlayerBackButton] m.videoPlayerScreen exists: " + (m.videoPlayerScreen <> invalid).ToStr()
+    print "HomeScene.brs - [onVideoPlayerBackButton] m.videoPlayerScreen.visible: " + videoPlayerVisible.ToStr()
+
+    if m.isVideoPlayerVisible = true or videoPlayerVisible = true
         print "HomeScene.brs - [onVideoPlayerBackButton] *** BACK BUTTON INTERCEPTED VIA FIELD OBSERVER ***"
-        
+        m.isProcessingVideoBackButton = true
+
         ' Get the source screen index from the video player
         sourceScreenIndex = -1
         if m.videoPlayerScreen <> invalid and m.videoPlayerScreen.sourceScreenIndex <> invalid
@@ -2513,12 +2581,27 @@ sub onVideoPlayerBackButton()
             print "HomeScene.brs - [onVideoPlayerBackButton] No source screen index, using previous screen: " + m.previousScreenIndex.ToStr()
             sourceScreenIndex = m.previousScreenIndex
         end if
-        
+
         ' Update the previous screen index to ensure proper restoration
         m.previousScreenIndex = sourceScreenIndex
-        
+
         hideVideoPlayer()
+        
+        ' Reset guard flag after a short delay
+        m.backButtonResetTimer = CreateObject("roSGNode", "Timer")
+        m.backButtonResetTimer.duration = 0.5
+        m.backButtonResetTimer.repeat = false
+        m.backButtonResetTimer.observeField("fire", "onBackButtonReset")
+        m.backButtonResetTimer.control = "start"
+    else
+        print "HomeScene.brs - [onVideoPlayerBackButton] ERROR: Video player not visible, cannot process back button"
     end if
+    print "HomeScene.brs - [onVideoPlayerBackButton] =========================================="
+end sub
+
+sub onBackButtonReset()
+    m.isProcessingVideoBackButton = false
+    print "HomeScene.brs - [onBackButtonReset] Back button guard reset"
 end sub
 
 sub onDVRRequested(event as object)
