@@ -809,13 +809,7 @@ sub onChannelSelected()
 end sub
 
 sub navigateToPlayVideo()
-    ' Get the video player screen
-    videoDVRScreen = m.global.findNode("videoDVRScreen")
-    
-    if videoDVRScreen = invalid
-        print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: videoDVRScreen not found"
-        return
-    end if
+    print "M3UChannelScreen.brs - [navigateToPlayVideo] =========================================="
     
     ' Get the selected channel from the active grid
     activeGrid = m.activeGrid
@@ -823,72 +817,64 @@ sub navigateToPlayVideo()
         print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No active grid"
         return
     end if
-    
+
     selectedIndex = activeGrid.itemFocused
     print "M3UChannelScreen.brs - [navigateToPlayVideo] Selected index: " + selectedIndex.ToStr()
-    
+
     if activeGrid.content = invalid
         print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No content in active grid"
         return
     end if
-    
+
     ' Get the channel node
     channelNode = activeGrid.content.getChild(selectedIndex)
-    
+
     if channelNode = invalid
         print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: Channel node not found"
         return
     end if
-    
+
     print "M3UChannelScreen.brs - [navigateToPlayVideo] Playing channel: " + channelNode.title
-    
+
     ' Get the stream URL from custom field
     streamUrl = ""
-    if channelNode.streamUrl <> invalid
+    if channelNode.streamUrl <> invalid and channelNode.streamUrl <> ""
         streamUrl = channelNode.streamUrl
     end if
-    
+
     if streamUrl = ""
         print "M3UChannelScreen.brs - [navigateToPlayVideo] ERROR: No stream URL found"
         return
     end if
-    
-    ' Create content node for video player
-    progNodeToPlay = CreateObject("roSGNode", "ContentNode")
-    progNodeToPlay.url = streamUrl
-    progNodeToPlay.title = channelNode.title
-    
-    ' Set description
-    if channelNode.description <> invalid
-        progNodeToPlay.description = channelNode.description
-    else
-        progNodeToPlay.description = ""
+
+    ' Get description
+    channelDescription = ""
+    if channelNode.description <> invalid and channelNode.description <> ""
+        channelDescription = channelNode.description
     end if
-    
-    ' Set poster (channel logo)
+
+    ' Get thumbnail
+    channelThumbnail = ""
     if channelNode.hdPosterUrl <> invalid and channelNode.hdPosterUrl <> ""
-        progNodeToPlay.hdposterurl = channelNode.hdPosterUrl
+        channelThumbnail = channelNode.hdPosterUrl
     end if
-    
-    ' Add additional fields
-    progNodeToPlay.addFields({
-        isCC: "false",
-        isHD: "true",
-        channelTitle: "M3U Channel",
-        streamFormat: "hls"
-    })
-    
-    print "M3UChannelScreen.brs - [navigateToPlayVideo] Setting content on videoDVRScreen"
-    print "M3UChannelScreen.brs - [navigateToPlayVideo] Stream URL: " + streamUrl
-    
-    ' Navigate to video player
-    videoDVRScreen.navigatedFrom = "M3UChannels"
-    videoDVRScreen.content = progNodeToPlay
-    videoDVRScreen.setFocus(true)
-    videoDVRScreen.visible = true
-    m.top.visible = false
-    
-    print "M3UChannelScreen.brs - [navigateToPlayVideo] Navigation complete"
+
+    ' Create video data for home scene video player
+    videoData = {
+        contentUrl: streamUrl,
+        title: channelNode.title,
+        description: channelDescription,
+        thumbnail: channelThumbnail,
+        isLive: true
+    }
+
+    print "M3UChannelScreen.brs - [navigateToPlayVideo] Sending video play request to home scene"
+    print "M3UChannelScreen.brs - [navigateToPlayVideo] Title: " + channelNode.title
+    print "M3UChannelScreen.brs - [navigateToPlayVideo] URL: " + streamUrl
+
+    ' Trigger video play request to parent (home scene)
+    m.top.videoPlayRequested = videoData
+    print "M3UChannelScreen.brs - [navigateToPlayVideo] =========================================="
 end sub
 
 sub showError(errorMsg as String)
@@ -916,7 +902,7 @@ end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     print "M3UChannelScreen.brs - [onKeyEvent] Key: " + key + ", Press: " + press.ToStr()
-    
+
     if press
         if key = "back"
             ' If in search mode, exit search first
@@ -924,9 +910,9 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                 exitSearchMode()
                 return true
             end if
-            
-            print "M3UChannelScreen.brs - [onKeyEvent] BACK pressed, hiding M3U screen"
-            
+
+            print "M3UChannelScreen.brs - [onKeyEvent] BACK pressed, resetting and hiding M3U screen"
+
             ' Stop any playing video first
             parentScene = m.top.getScene()
             if parentScene <> invalid
@@ -937,10 +923,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                     videoPlayer.visible = false
                 end if
             end if
-            
+
+            ' Reset the M3U screen completely
+            resetScreen()
+
             ' Hide this screen
             m.top.visible = false
-            
+
             ' Return focus to Personal content screen
             if parentScene <> invalid
                 ' Find the Personal content screen
@@ -949,15 +938,23 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                     for i = 0 to dynamicScreensContainer.getChildCount() - 1
                         screen = dynamicScreensContainer.getChild(i)
                         if screen <> invalid and screen.hasField("contentTypeId") and screen.contentTypeId = 16
-                            print "M3UChannelScreen.brs - [onKeyEvent] Found Personal screen, making visible and setting focus"
+                            print "M3UChannelScreen.brs - [onKeyEvent] Found Personal screen, making visible and restoring focus"
                             screen.visible = true
-                            screen.setFocus(true)
+                            
+                            ' Trigger focus restoration to last selected item
+                            if screen.hasField("restoreFocusRequested")
+                                screen.restoreFocusRequested = true
+                                print "M3UChannelScreen.brs - [onKeyEvent] Triggered restoreFocusRequested on Personal screen"
+                            else
+                                screen.setFocus(true)
+                                print "M3UChannelScreen.brs - [onKeyEvent] Set focus on Personal screen (no restoreFocusRequested field)"
+                            end if
                             exit for
                         end if
                     end for
                 end if
             end if
-            
+
             return true
         else if key = "options"
             ' Show search keyboard dialog
@@ -989,4 +986,68 @@ sub updateClockDisplay()
     if m.screenTimeLabel <> invalid
         m.screenTimeLabel.text = timeStr
     end if
+end sub
+
+sub resetScreen()
+    print "M3UChannelScreen.brs - [resetScreen] =========================================="
+    print "M3UChannelScreen.brs - [resetScreen] Resetting M3U Channel Screen"
+    
+    ' Clear all channel data
+    m.allChannels = []
+    m.displayedChannels = []
+    m.currentPage = 0
+    m.totalChannels = 0
+    
+    ' Clear search state
+    m.isSearchMode = false
+    m.searchQuery = ""
+    m.filteredChannels = []
+    
+    ' Clear grid content
+    if m.channelGrid <> invalid
+        m.channelGrid.content = CreateObject("roSGNode", "ContentNode")
+        print "M3UChannelScreen.brs - [resetScreen] Channel grid content cleared"
+    end if
+    
+    if m.searchGrid <> invalid
+        m.searchGrid.content = CreateObject("roSGNode", "ContentNode")
+        m.searchGrid.visible = false
+        print "M3UChannelScreen.brs - [resetScreen] Search grid content cleared and hidden"
+    end if
+    
+    ' Reset UI labels
+    if m.channelCountLabel <> invalid
+        m.channelCountLabel.text = ""
+    end if
+    
+    if m.selectedIndexLabel <> invalid
+        m.selectedIndexLabel.text = ""
+    end if
+    
+    if m.searchPromptLabel <> invalid
+        m.searchPromptLabel.visible = true
+    end if
+    
+    if m.searchStatusGroup <> invalid
+        m.searchStatusGroup.visible = false
+    end if
+    
+    ' Reset M3U URL
+    m.top.m3uUrl = ""
+    
+    ' Stop clock timer if running
+    if m.clockTimer <> invalid
+        m.clockTimer.control = "stop"
+    end if
+    
+    ' Cancel any pending API task
+    if m.m3uLoaderTask <> invalid
+        m.m3uLoaderTask.control = "stop"
+        m.m3uLoaderTask.unobserveField("m3uContent")
+        m.m3uLoaderTask.unobserveField("errorMessage")
+        m.m3uLoaderTask = invalid
+    end if
+    
+    print "M3UChannelScreen.brs - [resetScreen] Screen reset complete"
+    print "M3UChannelScreen.brs - [resetScreen] =========================================="
 end sub

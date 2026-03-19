@@ -1870,6 +1870,14 @@ sub showVideoPlayer(videoData as object)
         print "HomeScene.brs - [showVideoPlayer] Coming from SeasonScreen, will return there on back"
     end if
     
+    ' Check if we're coming from M3UChannelScreen
+    m.returnToM3UScreen = false
+    m3uScreen = m.top.findNode("m3uChannelScreen")
+    if m3uScreen <> invalid and m3uScreen.visible = true
+        m.returnToM3UScreen = true
+        print "HomeScene.brs - [showVideoPlayer] Coming from M3UChannelScreen, will return there on back"
+    end if
+    
     ' Store current screen and selection state for restoration
     m.previousScreenIndex = m.currentScreenIndex
     storePreviousItemSelection()
@@ -1941,11 +1949,24 @@ sub showVideoPlayer(videoData as object)
     m.videoPlayerScreen.backButtonPressed = false
     m.videoPlayerScreen.sourceScreenIndex = m.previousScreenIndex
     
+    ' Set navigatedFrom field for error dialog handling
+    if m.returnToM3UScreen = true
+        m.videoPlayerScreen.navigatedFrom = "M3UChannels"
+        print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to M3UChannels for error handling"
+    else if m.returnToSeasonScreen = true
+        m.videoPlayerScreen.navigatedFrom = "Seasons"
+        print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to Seasons for error handling"
+    else
+        m.videoPlayerScreen.navigatedFrom = ""
+        print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to empty (managed by home scene)"
+    end if
+    
     ' Debug: Verify fields were set
     print "HomeScene.brs - [showVideoPlayer] Field setting verification:"
     print "HomeScene.brs - [showVideoPlayer] managedByHomeScene: " + m.videoPlayerScreen.managedByHomeScene.ToStr()
     print "HomeScene.brs - [showVideoPlayer] sourceScreenIndex: " + m.videoPlayerScreen.sourceScreenIndex.ToStr()
     print "HomeScene.brs - [showVideoPlayer] backButtonPressed: " + m.videoPlayerScreen.backButtonPressed.ToStr()
+    print "HomeScene.brs - [showVideoPlayer] navigatedFrom: " + m.videoPlayerScreen.navigatedFrom
     
     ' Monitor for back button presses in the video player
     m.videoPlayerScreen.observeField("backButtonPressed", "onVideoPlayerBackButton")
@@ -2013,6 +2034,23 @@ sub hideVideoPlayer()
         end if
         
         m.returnToSeasonScreen = false
+    else if m.returnToM3UScreen = true
+        print "HomeScene.brs - [hideVideoPlayer] Returning to M3UChannelScreen"
+        
+        ' Restore navigation
+        if m.dynamicNavBar <> invalid
+            m.dynamicNavBar.visible = true
+        end if
+        
+        ' Show M3UChannelScreen
+        m3uScreen = m.top.findNode("m3uChannelScreen")
+        if m3uScreen <> invalid
+            m3uScreen.visible = true
+            m3uScreen.setFocus(true)
+            print "HomeScene.brs - [hideVideoPlayer] M3UChannelScreen restored and focused"
+        end if
+        
+        m.returnToM3UScreen = false
     else
         ' Restore navigation and content normally
         restoreNavigationAndContent()
@@ -2053,6 +2091,13 @@ sub hideAllScreensForVideo()
     if m.seasonScreen <> invalid
         m.seasonScreen.visible = false
         print "HomeScene.brs - [hideAllScreensForVideo] Hidden SeasonScreen"
+    end if
+    
+    ' Hide M3U channel screen
+    m3uScreen = m.top.findNode("m3uChannelScreen")
+    if m3uScreen <> invalid
+        m3uScreen.visible = false
+        print "HomeScene.brs - [hideAllScreensForVideo] Hidden M3UChannelScreen"
     end if
     
     ' Hide navigation

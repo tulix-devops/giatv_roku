@@ -82,31 +82,6 @@ sub onFocusChanged()
     print "DynamicContentScreen.brs - [onFocusChanged] Loading visible: " + m.loadingGroup.visible.ToStr()
     print "DynamicContentScreen.brs - [onFocusChanged] Screen focusable: " + m.top.focusable.ToStr()
     
-    ' CRITICAL FIX: Force load Personal page content if it's empty
-    if m.top.contentTypeId = 16 and m.contentRowList.visible = true
-        ? "========== CHECKING PERSONAL PAGE CONTENT =========="
-        if m.contentRowList.content = invalid
-            ? "========== PERSONAL PAGE HAS NO CONTENT - LOADING NOW =========="
-            loadPersonalPageContent()
-        else if m.contentRowList.content.getChildCount() = 0
-            ? "========== PERSONAL PAGE HAS EMPTY CONTENT - LOADING NOW =========="
-            loadPersonalPageContent()
-        else
-            ' Check if first row has items
-            firstRow = m.contentRowList.content.getChild(0)
-            if firstRow <> invalid
-                ? "Personal page first row has "; firstRow.getChildCount(); " items"
-                if firstRow.getChildCount() > 0
-                    firstItem = firstRow.getChild(0)
-                    ? "First item title: "; firstItem.title
-                    ? "First item hdPosterUrl: "; firstItem.hdPosterUrl
-                else
-                    ? "========== PERSONAL PAGE ROW HAS NO ITEMS - LOADING NOW =========="
-                    loadPersonalPageContent()
-                end if
-            end if
-        end if
-    end if
     
     if m.top.hasFocus()
         ' When content screen gains focus, check if we should set focus on content or return to navigation
@@ -127,16 +102,9 @@ sub onExplicitContentFocusRequested()
     end if
     
     print "DynamicContentScreen.brs - [onExplicitContentFocusRequested] User pressed RIGHT from navigation"
-    
-    ' Check if Personal page M3U card is visible (contentTypeId = 16)
-    m3uCardGroup = m.top.findNode("m3uCardGroup")
-    personalStaticGroup = m.top.findNode("personalStaticGroup")
-    if personalStaticGroup <> invalid and personalStaticGroup.visible = true and m3uCardGroup <> invalid
-        print "DynamicContentScreen.brs - [onExplicitContentFocusRequested] Setting focus on Personal M3U card"
-        m3uCardGroup.setFocus(true)
-        print "DynamicContentScreen.brs - [onExplicitContentFocusRequested] M3U card hasFocus: " + m3uCardGroup.hasFocus().ToStr()
+
     ' Check if User Channels grid is visible (contentTypeId = 14)
-    else if m.userChannelsGrid <> invalid and m.userChannelsGrid.visible = true
+    if m.userChannelsGrid <> invalid and m.userChannelsGrid.visible = true
         print "DynamicContentScreen.brs - [onExplicitContentFocusRequested] Setting focus on User Channels Grid"
         m.userChannelsGrid.setFocus(true)
         print "DynamicContentScreen.brs - [onExplicitContentFocusRequested] Grid hasFocus: " + m.userChannelsGrid.hasFocus().ToStr()
@@ -535,14 +503,14 @@ sub loadContentForType()
     print "DynamicContentScreen.brs - [loadContentForType] Loading content for type ID: " + contentTypeId.ToStr()
     print "DynamicContentScreen.brs - [loadContentForType] Screen translation: [" + m.top.translation[0].ToStr() + ", " + m.top.translation[1].ToStr() + "]"
     print "DynamicContentScreen.brs - [loadContentForType] This should load different content for different IDs"
-    
-    ' Special handling for Personal page (contentTypeId = 16) - show hardcoded M3U item
-    if contentTypeId = 16
-        print "DynamicContentScreen.brs - [loadContentForType] *** PERSONAL PAGE DETECTED - Loading hardcoded M3U item ***"
-        loadPersonalPageContent()
-        return
+
+    ' Hide the hardcoded Personal page static group if it exists
+    personalStaticGroup = m.top.findNode("personalStaticGroup")
+    if personalStaticGroup <> invalid
+        personalStaticGroup.visible = false
+        print "DynamicContentScreen.brs - [loadContentForType] Hidden personalStaticGroup"
     end if
-    
+
     ' Show per-screen loading state (do NOT show global loader here -
     ' global loader is managed at app level during init/reload only)
     showLoadingState()
@@ -1155,9 +1123,24 @@ sub onItemSelected()
                     end if
                     
                     print "DynamicContentScreen.brs - [onItemSelected] Content type: " + itemContentType + ", typeId: " + itemTypeId.ToStr()
+
+                    ' Check if this is an M3U Playlist
+                    ' Method 1: Check typeId or contentType (most reliable)
+                    isM3UPlaylist = (itemContentType = "m3u_playlist" or itemTypeId = 99)
                     
-                    ' Check if this is an M3U Playlist (typeId = 99 or type = "m3u_playlist")
-                    if itemContentType = "m3u_playlist" or itemTypeId = 99
+                    ' Method 2: Check if URL ends with .m3u (but NOT .m3u8 which is HLS video)
+                    if not isM3UPlaylist and selectedItem.url <> invalid and selectedItem.url <> ""
+                        urlLower = LCase(selectedItem.url)
+                        ' Only treat as M3U playlist if it ends with .m3u (not .m3u8)
+                        if urlLower.Right(4) = ".m3u" and urlLower.Right(5) <> ".m3u8"
+                            isM3UPlaylist = true
+                            print "DynamicContentScreen.brs - [onItemSelected] M3U playlist detected by .m3u extension"
+                        else
+                            print "DynamicContentScreen.brs - [onItemSelected] URL contains .m3u but is likely HLS stream (.m3u8), not M3U playlist"
+                        end if
+                    end if
+                    
+                    if isM3UPlaylist
                         print "DynamicContentScreen.brs - [onItemSelected] *** M3U PLAYLIST DETECTED - Navigating to M3UChannelScreen ***"
 
                         ' Navigate to M3UChannelScreen for M3U playlist
@@ -1201,24 +1184,53 @@ sub onItemSelected()
                         
                         ' PRIORITY 1: Check apiData field first (User Channels stores original API data here)
                         if selectedItem.apiData <> invalid
-                            ' Check apiData.sources
+                            print "DynamicContentScreen.brs - [onItemSelected] apiData exists, type: " + Type(selectedItem.apiData)
+                            print "DynamicContentScreen.brs - [onItemSelected] apiData content: " + FormatJson(selectedItem.apiData)
+                            
+                            ' Check apiData.sources - must verify it's an AA before calling DoesExist
                             if selectedItem.apiData.sources <> invalid
-                                if selectedItem.apiData.sources.primary <> invalid and selectedItem.apiData.sources.primary <> ""
-                                    contentUrl = selectedItem.apiData.sources.primary
-                                else if selectedItem.apiData.sources.hls <> invalid and selectedItem.apiData.sources.hls <> ""
-                                    contentUrl = selectedItem.apiData.sources.hls
-                                else if selectedItem.apiData.sources.secondary <> invalid and selectedItem.apiData.sources.secondary <> ""
-                                    contentUrl = selectedItem.apiData.sources.secondary
+                                sourcesType = Type(selectedItem.apiData.sources)
+                                print "DynamicContentScreen.brs - [onItemSelected] apiData.sources type: " + sourcesType
+                                
+                                if sourcesType = "roAssociativeArray"
+                                    ' Check primary field - must be a string, not boolean
+                                    if selectedItem.apiData.sources.DoesExist("primary") and selectedItem.apiData.sources.primary <> invalid
+                                        primaryType = Type(selectedItem.apiData.sources.primary)
+                                        if (primaryType = "roString" or primaryType = "String") and selectedItem.apiData.sources.primary <> ""
+                                            contentUrl = selectedItem.apiData.sources.primary
+                                            print "DynamicContentScreen.brs - [onItemSelected] Found URL in apiData.sources.primary"
+                                        end if
+                                    end if
+                                    
+                                    ' Check hls field - must be a string, not boolean
+                                    if contentUrl = "" and selectedItem.apiData.sources.DoesExist("hls") and selectedItem.apiData.sources.hls <> invalid
+                                        hlsType = Type(selectedItem.apiData.sources.hls)
+                                        if (hlsType = "roString" or hlsType = "String") and selectedItem.apiData.sources.hls <> ""
+                                            contentUrl = selectedItem.apiData.sources.hls
+                                            print "DynamicContentScreen.brs - [onItemSelected] Found URL in apiData.sources.hls"
+                                        end if
+                                    end if
+                                    
+                                    ' Check secondary field - must be a string, not boolean
+                                    if contentUrl = "" and selectedItem.apiData.sources.DoesExist("secondary") and selectedItem.apiData.sources.secondary <> invalid
+                                        secondaryType = Type(selectedItem.apiData.sources.secondary)
+                                        if (secondaryType = "roString" or secondaryType = "String") and selectedItem.apiData.sources.secondary <> ""
+                                            contentUrl = selectedItem.apiData.sources.secondary
+                                            print "DynamicContentScreen.brs - [onItemSelected] Found URL in apiData.sources.secondary"
+                                        end if
+                                    end if
                                 end if
                             end if
                             
                             ' Check apiData direct URL fields
                             if contentUrl = "" and selectedItem.apiData.url <> invalid and selectedItem.apiData.url <> ""
                                 contentUrl = selectedItem.apiData.url
+                                print "DynamicContentScreen.brs - [onItemSelected] Found URL in apiData.url"
                             end if
                             
                             if contentUrl = "" and selectedItem.apiData.stream_url <> invalid and selectedItem.apiData.stream_url <> ""
                                 contentUrl = selectedItem.apiData.stream_url
+                                print "DynamicContentScreen.brs - [onItemSelected] Found URL in apiData.stream_url"
                             end if
                         end if
                         
@@ -1438,23 +1450,34 @@ end sub
 ' Navigate to M3UChannelScreen for M3U playlist
 sub navigateToM3UScreen(selectedItem as object)
     print "DynamicContentScreen.brs - [navigateToM3UScreen] *** NAVIGATING TO M3U CHANNEL SCREEN ***"
-    
+
     if selectedItem = invalid
         print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: selectedItem is invalid"
         return
     end if
-    
-    ' Get M3U URL from selected item
+
+    ' Get M3U URL from selected item (check multiple fields)
     m3uUrl = ""
-    if selectedItem.m3uUrl <> invalid
+    if selectedItem.m3uUrl <> invalid and selectedItem.m3uUrl <> ""
         m3uUrl = selectedItem.m3uUrl
+    else if selectedItem.url <> invalid and selectedItem.url <> ""
+        ' Check if the URL ends with .m3u (but NOT .m3u8 which is HLS video)
+        urlLower = LCase(selectedItem.url)
+        if urlLower.Right(4) = ".m3u" and urlLower.Right(5) <> ".m3u8"
+            m3uUrl = selectedItem.url
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] Found M3U playlist URL in 'url' field"
+        else
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] URL is not an M3U playlist (likely .m3u8 HLS stream)"
+        end if
     end if
-    
+
     if m3uUrl = ""
         print "DynamicContentScreen.brs - [navigateToM3UScreen] ERROR: No M3U URL found in selected item"
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] Item has m3uUrl: " + (selectedItem.m3uUrl <> invalid).ToStr()
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] Item has url: " + (selectedItem.url <> invalid).ToStr()
         return
     end if
-    
+
     print "DynamicContentScreen.brs - [navigateToM3UScreen] M3U URL: " + m3uUrl
     print "DynamicContentScreen.brs - [navigateToM3UScreen] Playlist Title: " + selectedItem.title
     
@@ -1478,6 +1501,10 @@ sub navigateToM3UScreen(selectedItem as object)
         
         ' Add to parent scene
         parentScene.appendChild(m3uScreen)
+        
+        ' Set up video play observer for M3UChannelScreen
+        m3uScreen.observeField("videoPlayRequested", "onM3UVideoPlayRequested")
+        
         print "DynamicContentScreen.brs - [navigateToM3UScreen] M3UChannelScreen created and added to scene"
     else
         print "DynamicContentScreen.brs - [navigateToM3UScreen] Found existing M3UChannelScreen"
@@ -1561,6 +1588,24 @@ sub onSeriesApiError()
     
     ' Show season screen with basic info as fallback
     showSeasonScreenWithBasicInfo()
+end sub
+
+' Callback when M3UChannelScreen requests video playback
+sub onM3UVideoPlayRequested()
+    print "DynamicContentScreen.brs - [onM3UVideoPlayRequested] M3U video play requested"
+    
+    ' Get the M3U screen
+    parentScene = m.top.getParent()
+    if parentScene <> invalid
+        m3uScreen = parentScene.findNode("m3uChannelScreen")
+        if m3uScreen <> invalid and m3uScreen.videoPlayRequested <> invalid
+            videoData = m3uScreen.videoPlayRequested
+            print "DynamicContentScreen.brs - [onM3UVideoPlayRequested] Forwarding video request to home scene: " + videoData.title
+            
+            ' Forward the video play request to home scene
+            m.top.videoPlayRequested = videoData
+        end if
+    end if
 end sub
 
 ' Process series data object (already parsed from API response)

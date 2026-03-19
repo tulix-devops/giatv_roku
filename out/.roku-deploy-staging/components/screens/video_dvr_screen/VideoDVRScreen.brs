@@ -73,22 +73,40 @@ sub On_dialogErrStream_buttonSelected()
     ' Navigate back to the source screen after error dialog is closed
     if m.top.navigatedFrom = "M3UChannels"
         print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Returning to M3U Channels screen"
+
+        ' Get the main scene to restore navigation bar
+        mainScene = m.top.getScene()
         
-        m3uScreen = m.global.findNode("m3uChannelScreen")
+        ' Restore navigation bar
+        if mainScene <> invalid
+            dynamicNavBar = mainScene.findNode("dynamicNavigationBar")
+            if dynamicNavBar <> invalid
+                dynamicNavBar.visible = true
+                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Restored navigation bar"
+            end if
+        end if
+
+        m3uScreen = mainScene.findNode("m3uChannelScreen")
         if m3uScreen <> invalid
             print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Found m3uChannelScreen"
             m3uScreen.visible = true
-            
+
             ' Get the channel grid and restore focus
             channelGrid = m3uScreen.findNode("channelGrid")
-            if channelGrid <> invalid
+            searchGrid = m3uScreen.findNode("searchResultsGrid")
+            
+            ' Check which grid is active (search or main)
+            if searchGrid <> invalid and searchGrid.visible = true
+                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Setting focus on search grid"
+                searchGrid.setFocus(true)
+            else if channelGrid <> invalid
                 print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Setting focus on channel grid"
                 channelGrid.setFocus(true)
             else
-                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] channelGrid not found, setting focus on screen"
+                print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] No grid found, setting focus on screen"
                 m3uScreen.setFocus(true)
             end if
-            
+
             print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Focus returned to M3U screen"
         else
             print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] ERROR: m3uChannelScreen not found"

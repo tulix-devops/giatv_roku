@@ -2,6 +2,7 @@
 <component name="M3UChannelScreen" extends="Group" focusable="true">
     <interface>
         <field id="m3uUrl" type="string" onChange="onM3uUrlChanged"/>
+        <field id="videoPlayRequested" type="assocarray" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/screens/M3UChannelScreen.brs"/>
