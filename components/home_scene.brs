@@ -1365,7 +1365,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
     if m.isVideoPlayerVisible = true
         print "HomeScene.brs - [onKeyEvent] Video player is visible, handling key: " + key
         
-        if key = "back" or key = "left"
+        if key = "back"
             print "HomeScene.brs - [onKeyEvent] *** BACK BUTTON INTERCEPTED IN HOME SCENE ***"
             print "HomeScene.brs - [onKeyEvent] Stopping video and returning to content"
             
@@ -1405,11 +1405,39 @@ function onKeyEvent(key as string, press as boolean) as boolean
             ' Block up/down keys when video player is visible
             print "HomeScene.brs - [onKeyEvent] Blocking " + key + " key while video player is visible"
             return true
-        else
-            ' Let video player handle other keys (seeking, etc.)
+        else if key = "right" or key = "fastforward" or key = "forward"
+            ' Handle seeking forward
             if m.videoPlayerScreen <> invalid
-                return m.videoPlayerScreen.callFunc("onKeyEvent", key, press)
+                videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
+                if videoPlayerNode <> invalid
+                    currentPos = videoPlayerNode.position
+                    duration = videoPlayerNode.duration
+                    if duration > 0
+                        newPos = currentPos + 10
+                        if newPos > duration then newPos = duration
+                        videoPlayerNode.seek = newPos
+                        print "HomeScene.brs - [onKeyEvent] Seeking forward to: " + newPos.ToStr()
+                    end if
+                    return true
+                end if
             end if
+        else if key = "left" or key = "rewind" or key = "replay"
+            ' Handle seeking backward
+            if m.videoPlayerScreen <> invalid
+                videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
+                if videoPlayerNode <> invalid
+                    currentPos = videoPlayerNode.position
+                    newPos = currentPos - 10
+                    if newPos < 0 then newPos = 0
+                    videoPlayerNode.seek = newPos
+                    print "HomeScene.brs - [onKeyEvent] Seeking backward to: " + newPos.ToStr()
+                    return true
+                end if
+            end if
+        else
+            ' For any other keys, just consume them to prevent propagation
+            print "HomeScene.brs - [onKeyEvent] Consuming key '" + key + "' while video player is visible"
+            return true
         end if
     end if
     

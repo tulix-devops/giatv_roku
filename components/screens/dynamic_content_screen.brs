@@ -40,6 +40,12 @@ sub init()
     ' Content API reference
     m.contentApi = invalid
     
+    ' Content caching - store loaded content per contentTypeId
+    m.contentCache = {}
+    m.cacheTimestamps = {}
+    m.cacheTTL = 300  ' Cache TTL in seconds (5 minutes)
+    m.dataLoaded = false
+    
     ' Initialize auth required state
     m.showingAuthRequired = false
     m.authRequiredGroup = invalid
@@ -502,7 +508,6 @@ sub loadContentForType()
     
     print "DynamicContentScreen.brs - [loadContentForType] Loading content for type ID: " + contentTypeId.ToStr()
     print "DynamicContentScreen.brs - [loadContentForType] Screen translation: [" + m.top.translation[0].ToStr() + ", " + m.top.translation[1].ToStr() + "]"
-    print "DynamicContentScreen.brs - [loadContentForType] This should load different content for different IDs"
 
     ' Hide the hardcoded Personal page static group if it exists
     personalStaticGroup = m.top.findNode("personalStaticGroup")
@@ -510,6 +515,38 @@ sub loadContentForType()
         personalStaticGroup.visible = false
         print "DynamicContentScreen.brs - [loadContentForType] Hidden personalStaticGroup"
     end if
+
+    ' ============ CACHING OPTIMIZATION ============
+    ' Check if we have valid cached content for this contentTypeId
+    cacheKey = contentTypeId.ToStr()
+    
+    if m.contentCache.DoesExist(cacheKey) and m.cacheTimestamps.DoesExist(cacheKey)
+        currentTime = CreateObject("roDateTime").AsSeconds()
+        cacheAge = currentTime - m.cacheTimestamps[cacheKey]
+        
+        print "DynamicContentScreen.brs - [loadContentForType] *** CACHE CHECK ***"
+        print "DynamicContentScreen.brs - [loadContentForType] Cache age: " + cacheAge.ToStr() + "s, TTL: " + m.cacheTTL.ToStr() + "s"
+        
+        if cacheAge < m.cacheTTL
+            ' Cache is valid - use cached content
+            print "DynamicContentScreen.brs - [loadContentForType] *** USING CACHED CONTENT (saved API call!) ***"
+            cachedContent = m.contentCache[cacheKey]
+            
+            if cachedContent <> invalid and cachedContent.Count() > 0
+                hideLoadingState()
+                buildContentDisplay(cachedContent)
+                print "DynamicContentScreen.brs - [loadContentForType] Displayed " + cachedContent.Count().ToStr() + " cached categories"
+                return
+            else
+                print "DynamicContentScreen.brs - [loadContentForType] Cached content is empty, fetching fresh data"
+            end if
+        else
+            print "DynamicContentScreen.brs - [loadContentForType] Cache expired, fetching fresh data"
+        end if
+    else
+        print "DynamicContentScreen.brs - [loadContentForType] No cache found, fetching fresh data"
+    end if
+    ' ============ END CACHING OPTIMIZATION ============
 
     ' Show per-screen loading state (do NOT show global loader here -
     ' global loader is managed at app level during init/reload only)
@@ -648,11 +685,19 @@ end sub
 
 sub handleContentItems()
     print "DynamicContentScreen.brs - [handleContentItems] Content items received for contentTypeId: " + m.top.contentTypeId.ToStr()
-    
+
     contentItems = m.contentApi.contentItems
-    
+
     if contentItems <> invalid and contentItems.Count() > 0
         print "DynamicContentScreen.brs - [handleContentItems] Processing " + contentItems.Count().ToStr() + " categories"
+        
+        ' ============ CACHE THE CONTENT ============
+        cacheKey = m.top.contentTypeId.ToStr()
+        m.contentCache[cacheKey] = contentItems
+        m.cacheTimestamps[cacheKey] = CreateObject("roDateTime").AsSeconds()
+        print "DynamicContentScreen.brs - [handleContentItems] *** CACHED content for contentTypeId: " + cacheKey + " ***"
+        ' ============================================
+        
         m.top.contentData = contentItems
         buildContentDisplay(contentItems)
     else

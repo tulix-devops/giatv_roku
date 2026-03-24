@@ -78,6 +78,10 @@ sub init()
     m.isClosingDetailView = false
     m.timeGridHasBeenFocused = false
     
+    ' Track currently playing program for full screen detection
+    m.currentPlayingChannelIndex = -1
+    m.currentPlayingProgramIndex = -1
+    
     ' Set up TimeGrid observers
     if m.timeGrid <> invalid
         m.timeGrid.observeField("programSelected", "onProgramSelected")
@@ -266,7 +270,7 @@ sub onVisibleChanged()
             channelIndex = m.timeGrid.channelFocused
             programIndex = m.timeGrid.programFocused
             if channelIndex <> invalid and programIndex <> invalid and programIndex >= 0
-                updateFocusedItemDetails(channelIndex, programIndex)
+                updateFocusedItemDetails(channelIndex, programIndex, false)
             end if
         end if
     else
@@ -302,37 +306,32 @@ sub onChannelFocused()
     
     if channelIndex <> invalid and programIndex <> invalid
         if m.isDetailViewOpen = true
-            updateFocusedItemDetails(channelIndex, programIndex)
+            ' On channel focus change, update details only (not video player)
+            updateFocusedItemDetails(channelIndex, programIndex, false)
         end if
     end if
 end sub
 
 sub onProgramFocused()
     if m.timeGrid = invalid then return
-    
+
     channelIndex = m.timeGrid.channelFocused
     programIndex = m.timeGrid.programFocused
-    
+
     print "TVGuideScreen.brs - [onProgramFocused] =========================================="
     print "TVGuideScreen.brs - [onProgramFocused] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
     print "TVGuideScreen.brs - [onProgramFocused] isDetailViewOpen: " + m.isDetailViewOpen.ToStr()
-    
+
     if channelIndex = invalid or programIndex = invalid or programIndex < 0
-        print "TVGuideScreen.brs - [onProgramFocused] Invalid indices, stopping video"
-        if m.videoPlayer <> invalid
-            m.videoPlayer.control = "stop"
-        end if
-        if m.videoPlayerStatus <> invalid
-            m.videoPlayerStatus.text = "No program at this time"
-            m.videoPlayerStatus.visible = true
-        end if
+        print "TVGuideScreen.brs - [onProgramFocused] Invalid indices"
         return
     end if
-    
-    ' Always update details when program focus changes and detail view is open
+
+    ' Update details (title/description) when program focus changes and detail view is open
+    ' DO NOT update video player on focus - only on SELECT
     if m.isDetailViewOpen = true
-        print "TVGuideScreen.brs - [onProgramFocused] Detail view open, updating details"
-        updateFocusedItemDetails(channelIndex, programIndex)
+        print "TVGuideScreen.brs - [onProgramFocused] Detail view open, updating details (focus only, no video change)"
+        updateFocusedItemDetails(channelIndex, programIndex, false)
     end if
 end sub
 
@@ -401,7 +400,8 @@ sub onInitialDetailUpdate()
         programIndex = m.timeGrid.programFocused
         print "TVGuideScreen.brs - [onInitialDetailUpdate] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
         if channelIndex <> invalid and programIndex <> invalid and programIndex >= 0
-            updateFocusedItemDetails(channelIndex, programIndex)
+            ' Initial detail update: show details but don't start video yet (wait for SELECT)
+            updateFocusedItemDetails(channelIndex, programIndex, false)
         end if
     end if
 end sub
@@ -410,6 +410,11 @@ sub closeDetailView()
     print "TVGuideScreen.brs - [closeDetailView] Closing detail view"
     m.isClosingDetailView = true
     m.isDetailViewOpen = false
+    
+    ' Reset currently playing program tracking
+    m.currentPlayingChannelIndex = -1
+    m.currentPlayingProgramIndex = -1
+    print "TVGuideScreen.brs - [closeDetailView] Reset playing program tracking"
     
     if m.videoPlayer <> invalid
         m.videoPlayer.control = "stop"
@@ -483,10 +488,11 @@ sub onCloseAnimationComplete()
     m.isClosingDetailView = false
 end sub
 
-sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
+sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer, updateVideoPlayer as Boolean)
     print "TVGuideScreen.brs - [updateFocusedItemDetails] ========== UPDATING DETAILS =========="
     print "TVGuideScreen.brs - [updateFocusedItemDetails] Channel index: " + channelIndex.ToStr()
     print "TVGuideScreen.brs - [updateFocusedItemDetails] Program index: " + programIndex.ToStr()
+    print "TVGuideScreen.brs - [updateFocusedItemDetails] Update video player: " + updateVideoPlayer.ToStr()
     
     ' Update channel logo and program details
     content = m.timeGrid.content
@@ -641,19 +647,17 @@ sub updateFocusedItemDetails(channelIndex as Integer, programIndex as Integer)
         print "TVGuideScreen.brs - [updateFocusedItemDetails] ERROR: m.programDescription is invalid"
     end if
     
-    ' Log program status
-    playStartTime = program.PLAYSTART
-    playDurationTime = program.PLAYDURATION
-    if playStartTime = invalid then playStartTime = program.playStart
-    if playDurationTime = invalid then playDurationTime = program.playDuration
-    
-    diff = m.timeGrid.leftEdgeTargetTime - playStartTime
-    
-    bIsInPast = diff > 0 and (diff - playDurationTime) > 0
-    bIsInFuture = (diff + m.timeGrid.duration) < 0
-    
-    if originalChannel <> invalid
+    ' Only update video player if explicitly requested (on SELECT, not on FOCUS)
+    if updateVideoPlayer = true and originalChannel <> invalid
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] Updating video player preview"
         playChannelPreview(originalChannel, originalProgram)
+        
+        ' Store currently playing program for full screen detection
+        m.currentPlayingChannelIndex = channelIndex
+        m.currentPlayingProgramIndex = programIndex
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] Stored playing program: [" + channelIndex.ToStr() + ", " + programIndex.ToStr() + "]"
+    else
+        print "TVGuideScreen.brs - [updateFocusedItemDetails] Skipping video player update (focus only)"
     end if
 end sub
 
@@ -723,18 +727,26 @@ sub onProgramSelected()
     if m.timeGrid = invalid then return
     
     print "TVGuideScreen.brs - [onProgramSelected] =========================================="
-    print "TVGuideScreen.brs - [onProgramSelected] Program selected"
-    
-    if m.videoPlayer <> invalid
-        m.videoPlayer.control = "stop"
-    end if
+    print "TVGuideScreen.brs - [onProgramSelected] Program selected with OK button"
     
     channelIndex = m.timeGrid.channelSelected
     programIndex = m.timeGrid.programSelected
     
-    print "TVGuideScreen.brs - [onProgramSelected] Channel: " + channelIndex.ToStr() + ", Program: " + programIndex.ToStr()
+    print "TVGuideScreen.brs - [onProgramSelected] Selected: [" + channelIndex.ToStr() + ", " + programIndex.ToStr() + "]"
+    print "TVGuideScreen.brs - [onProgramSelected] Currently playing: [" + m.currentPlayingChannelIndex.ToStr() + ", " + m.currentPlayingProgramIndex.ToStr() + "]"
     
-    if channelIndex <> invalid and programIndex <> invalid
+    if channelIndex = invalid or programIndex = invalid
+        print "TVGuideScreen.brs - [onProgramSelected] Invalid selection indices"
+        return
+    end if
+    
+    ' Check if user selected the SAME program that's already playing in small player
+    isSameProgram = (channelIndex = m.currentPlayingChannelIndex and programIndex = m.currentPlayingProgramIndex)
+    
+    if isSameProgram
+        print "TVGuideScreen.brs - [onProgramSelected] *** SAME PROGRAM - Opening full screen video player ***"
+        
+        ' Get program data for full screen playback
         content = m.timeGrid.content
         if content <> invalid
             channelNode = content.GetChild(channelIndex)
@@ -772,43 +784,54 @@ sub onProgramSelected()
                         end if
                     end if
                     
-                    if streamUrl = "" or streamUrl = invalid then return
-                    
-                    programTitle = "Live TV"
-                    if program.title <> invalid and program.title <> ""
-                        programTitle = program.title
+                    if streamUrl <> "" and streamUrl <> invalid
+                        programTitle = "Live TV"
+                        if program.title <> invalid and program.title <> ""
+                            programTitle = program.title
+                        end if
+                        
+                        channelTitle = "Unknown Channel"
+                        if channelNode.title <> invalid and channelNode.title <> ""
+                            channelTitle = channelNode.title
+                        end if
+                        
+                        programDescription = ""
+                        if program.description <> invalid and program.description <> ""
+                            programDescription = program.description
+                        end if
+                        
+                        thumbnailUrl = ""
+                        if channelNode.HDSMALLICONURL <> invalid and channelNode.HDSMALLICONURL <> ""
+                            thumbnailUrl = channelNode.HDSMALLICONURL
+                        else if channelNode.HDPOSTERURL <> invalid and channelNode.HDPOSTERURL <> ""
+                            thumbnailUrl = channelNode.HDPOSTERURL
+                        end if
+                        
+                        videoData = {
+                            contentUrl: streamUrl,
+                            title: programTitle + " - " + channelTitle,
+                            description: programDescription,
+                            thumbnail: thumbnailUrl,
+                            isLive: true
+                        }
+                        
+                        print "TVGuideScreen.brs - [onProgramSelected] Opening full screen video player"
+                        m.top.videoPlayRequested = videoData
                     end if
-                    
-                    channelTitle = "Unknown Channel"
-                    if channelNode.title <> invalid and channelNode.title <> ""
-                        channelTitle = channelNode.title
-                    end if
-                    
-                    programDescription = ""
-                    if program.description <> invalid and program.description <> ""
-                        programDescription = program.description
-                    end if
-                    
-                    thumbnailUrl = ""
-                    if channelNode.HDSMALLICONURL <> invalid and channelNode.HDSMALLICONURL <> ""
-                        thumbnailUrl = channelNode.HDSMALLICONURL
-                    else if channelNode.HDPOSTERURL <> invalid and channelNode.HDPOSTERURL <> ""
-                        thumbnailUrl = channelNode.HDPOSTERURL
-                    end if
-                    
-                    videoData = {
-                        contentUrl: streamUrl,
-                        title: programTitle + " - " + channelTitle,
-                        description: programDescription,
-                        thumbnail: thumbnailUrl,
-                        isLive: true
-                    }
-                    
-                    m.top.videoPlayRequested = videoData
                 end if
             end if
         end if
+    else
+        print "TVGuideScreen.brs - [onProgramSelected] *** DIFFERENT PROGRAM - Updating small video player only ***"
+        
+        ' Update small video player to the newly selected program
+        if channelIndex <> invalid and programIndex <> invalid
+            ' Update details AND video player (updateVideoPlayer = true)
+            updateFocusedItemDetails(channelIndex, programIndex, true)
+        end if
     end if
+    
+    print "TVGuideScreen.brs - [onProgramSelected] =========================================="
 end sub
 
 sub onVideoStateChanged()

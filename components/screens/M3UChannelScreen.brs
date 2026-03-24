@@ -653,52 +653,61 @@ sub updateSearchDisplay()
 end sub
 
 sub performSearch()
+    print "M3UChannelScreen.brs - [performSearch] =========================================="
     print "M3UChannelScreen.brs - [performSearch] Searching for: '" + m.searchQuery + "'"
-    
+    print "M3UChannelScreen.brs - [performSearch] Total channels available: " + m.channels.Count().ToStr()
+    print "M3UChannelScreen.brs - [performSearch] Previously loaded channels: " + m.loadedChannels.ToStr()
+
     if m.searchQuery = ""
-        ' Empty search - show all loaded channels
+        ' Empty search - show all channels (not just loaded ones)
         m.filteredChannels = []
-        for i = 0 to m.loadedChannels - 1
-            if i < m.channels.Count()
+        for i = 0 to m.channels.Count() - 1
+            if m.channels[i] <> invalid
                 m.filteredChannels.Push(m.channels[i])
             end if
         end for
+        print "M3UChannelScreen.brs - [performSearch] Empty query - showing all " + m.filteredChannels.Count().ToStr() + " channels"
     else
-        ' Filter channels by search query
+        ' Filter channels by search query - search through ALL channels, not just loaded
         m.filteredChannels = []
         searchLower = LCase(m.searchQuery)
+
+        print "M3UChannelScreen.brs - [performSearch] Searching through ALL " + m.channels.Count().ToStr() + " channels"
         
-        for i = 0 to m.loadedChannels - 1
+        for i = 0 to m.channels.Count() - 1
             if i >= m.channels.Count() then exit for
-            
+
             channel = m.channels[i]
             if channel <> invalid
                 ' Search in channel name and category
                 matchFound = false
-                
+
                 if channel.name <> invalid and channel.name <> ""
-                    if LCase(channel.name).Instr(searchLower) > 0
+                    if LCase(channel.name).Instr(searchLower) >= 0
                         matchFound = true
                     end if
                 end if
-                
+
                 if not matchFound and channel.category <> invalid and channel.category <> ""
-                    if LCase(channel.category).Instr(searchLower) > 0
+                    if LCase(channel.category).Instr(searchLower) >= 0
                         matchFound = true
                     end if
                 end if
-                
+
                 if matchFound
                     m.filteredChannels.Push(channel)
                 end if
             end if
         end for
+        
+        print "M3UChannelScreen.brs - [performSearch] Found " + m.filteredChannels.Count().ToStr() + " matching channels out of " + m.channels.Count().ToStr() + " total"
     end if
-    
+
     ' Build search results grid
     buildSearchResults()
-    
-    print "M3UChannelScreen.brs - [performSearch] Found " + m.filteredChannels.Count().ToStr() + " matching channels"
+
+    print "M3UChannelScreen.brs - [performSearch] Search complete - displaying " + m.filteredChannels.Count().ToStr() + " results"
+    print "M3UChannelScreen.brs - [performSearch] =========================================="
 end sub
 
 sub buildSearchResults()
