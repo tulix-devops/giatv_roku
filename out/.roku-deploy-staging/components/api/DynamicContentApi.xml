@@ -4,6 +4,9 @@
   <script type="text/brightscript" uri="pkg:/components/helpers/ContentItemHelper.brs" />
   <interface>
     <field id="contentTypeId" type="int" value="-1" />
+    <field id="pageNumber" type="int" value="1" />
+    <field id="totalPages" type="int" value="0" />
+    <field id="totalItems" type="int" value="0" />
     <field id="responseData" type="string" />
     <field id="errorMessage" type="string" />
     <field id="contentItems" type="array" />

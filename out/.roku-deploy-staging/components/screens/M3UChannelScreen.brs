@@ -103,6 +103,12 @@ sub loadM3UPlaylist()
     print "M3UChannelScreen.brs - [loadM3UPlaylist] Starting to load M3U playlist"
     print "M3UChannelScreen.brs - [loadM3UPlaylist] URL: " + m.top.m3uUrl
     
+    ' Reset loading label text (in case it was showing an error message before)
+    loadingLabel = m.top.findNode("loadingLabel")
+    if loadingLabel <> invalid
+        loadingLabel.text = "Loading M3U playlist..."
+    end if
+    
     ' Show loading indicator, hide grid
     if m.loadingGroup <> invalid
         m.loadingGroup.visible = true

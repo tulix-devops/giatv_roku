@@ -32,6 +32,14 @@ sub GetDynamicContentData()
 
     url = "https://giatv.dineo.uk/api/" + apiEndpoint
     
+    ' Add pagination for User Channels (contentTypeId = 14)
+    if contentTypeId = 14
+        pageNum = m.top.pageNumber
+        if pageNum < 1 then pageNum = 1
+        url = url + "?page=" + pageNum.ToStr()
+        print "DynamicContentApi.brs - [GetDynamicContentData] User Channels URL with pagination: " + url
+    end if
+    
     request = CreateObject("roUrlTransfer")
     request.SetCertificatesFile("common:/certs/ca-bundle.crt")
     request.SetUrl(url)
@@ -47,9 +55,10 @@ sub GetDynamicContentData()
     
     ' User Channels (14) needs synchronous GetToString for proper response handling
     if contentTypeId = 14
+        print "DynamicContentApi.brs - [GetDynamicContentData] Fetching User Channels page " + m.top.pageNumber.ToStr()
         response = request.GetToString()
         if response <> "" and response <> invalid
-            processResponse(response, contentTypeId)
+            processResponseWithPagination(response, contentTypeId)
         else
             useDefaultContent(contentTypeId)
         end if
@@ -79,16 +88,61 @@ sub GetDynamicContentData()
     end if
 end sub
 
+sub processResponseWithPagination(response as string, contentTypeId as integer)
+    ' Special handler for paginated responses (User Channels)
+    print "DynamicContentApi.brs - [processResponseWithPagination] Processing paginated response"
+    
+    parsedResponse = ParseJson(response)
+    if parsedResponse = invalid
+        print "DynamicContentApi.brs - [processResponseWithPagination] Failed to parse response"
+        useDefaultContent(contentTypeId)
+        return
+    end if
+    
+    ' Extract pagination metadata from "meta" field
+    ' API format: { "data": [...], "meta": { "currentPage": 1, "lastPage": 16, "total": 787 } }
+    if parsedResponse.meta <> invalid
+        if parsedResponse.meta.lastPage <> invalid
+            m.top.totalPages = parsedResponse.meta.lastPage
+            print "DynamicContentApi.brs - [processResponseWithPagination] Total pages: " + m.top.totalPages.ToStr()
+        end if
+        if parsedResponse.meta.total <> invalid
+            m.top.totalItems = parsedResponse.meta.total
+            print "DynamicContentApi.brs - [processResponseWithPagination] Total items: " + m.top.totalItems.ToStr()
+        end if
+        if parsedResponse.meta.currentPage <> invalid
+            print "DynamicContentApi.brs - [processResponseWithPagination] Current page: " + parsedResponse.meta.currentPage.ToStr()
+        end if
+    end if
+    
+    ' Extract data
+    responseDataField = parsedResponse["data"]
+    if responseDataField <> invalid
+        dataInterface = GetInterface(responseDataField, "ifArray")
+        if dataInterface <> invalid
+            print "DynamicContentApi.brs - [processResponseWithPagination] Found " + responseDataField.Count().ToStr() + " items on this page"
+            m.top.responseData = response
+            userChannelsContentItems = convertUserChannelsToContentItems(responseDataField)
+            m.top.contentItems = userChannelsContentItems
+            return
+        end if
+    end if
+    
+    print "DynamicContentApi.brs - [processResponseWithPagination] No valid data found"
+    m.top.responseData = response
+    m.top.contentItems = []
+end sub
+
 sub processResponse(response as string, contentTypeId as integer)
     parsedResponse = ParseJson(response)
     if parsedResponse = invalid
         useDefaultContent(contentTypeId)
         return
     end if
-    
+
     hasValidData = false
     responseDataField = invalid
-    
+
     ' Check if response is a direct array (TV Guide format)
     directArrayInterface = GetInterface(parsedResponse, "ifArray")
     if directArrayInterface <> invalid
@@ -104,10 +158,10 @@ sub processResponse(response as string, contentTypeId as integer)
             end if
         end if
     end if
-    
+
     if hasValidData
         m.top.responseData = response
-        
+
         if contentTypeId = 17
             tvGuideContentItems = convertTVGuideToContentItems(responseDataField)
             m.top.contentItems = tvGuideContentItems

@@ -64,6 +64,14 @@ sub init()
     m.lastFocusedRow = 0
     m.lastFocusedItem = 0
     
+    ' User Channels pagination state
+    m.userChannelsCurrentPage = 0
+    m.userChannelsTotalPages = 0
+    m.userChannelsTotalItems = 0
+    m.userChannelsLoadedItems = 0
+    m.userChannelsIsLoadingMore = false
+    m.userChannelsGridContent = invalid
+    
     ' Set up RowList event handlers
     m.contentRowList.observeField("itemSelected", "onItemSelected")
     m.contentRowList.observeField("itemFocused", "onItemFocused")
@@ -690,20 +698,134 @@ sub handleContentItems()
 
     if contentItems <> invalid and contentItems.Count() > 0
         print "DynamicContentScreen.brs - [handleContentItems] Processing " + contentItems.Count().ToStr() + " categories"
-        
+
+        ' ============ HANDLE USER CHANNELS PAGINATION ============
+        if m.top.contentTypeId = 14
+            ' Store pagination metadata
+            if m.contentApi.totalPages <> invalid
+                m.userChannelsTotalPages = m.contentApi.totalPages
+            end if
+            if m.contentApi.totalItems <> invalid
+                m.userChannelsTotalItems = m.contentApi.totalItems
+            end if
+            
+            print "DynamicContentScreen.brs - [handleContentItems] User Channels pagination:"
+            print "DynamicContentScreen.brs - [handleContentItems]   Page: " + m.userChannelsCurrentPage.ToStr() + " of " + m.userChannelsTotalPages.ToStr()
+            print "DynamicContentScreen.brs - [handleContentItems]   Total items: " + m.userChannelsTotalItems.ToStr()
+            
+            ' For initial page load or append mode
+            if m.userChannelsIsLoadingMore = true
+                ' Append to existing content
+                appendUserChannelsContent(contentItems)
+                m.userChannelsIsLoadingMore = false
+            else
+                ' Initial load - build grid fresh
+                m.userChannelsCurrentPage = 1
+                m.top.contentData = contentItems
+                buildContentDisplay(contentItems)
+            end if
+            return
+        end if
+        ' ============================================================
+
         ' ============ CACHE THE CONTENT ============
         cacheKey = m.top.contentTypeId.ToStr()
         m.contentCache[cacheKey] = contentItems
         m.cacheTimestamps[cacheKey] = CreateObject("roDateTime").AsSeconds()
         print "DynamicContentScreen.brs - [handleContentItems] *** CACHED content for contentTypeId: " + cacheKey + " ***"
         ' ============================================
-        
+
         m.top.contentData = contentItems
         buildContentDisplay(contentItems)
     else
         print "DynamicContentScreen.brs - [handleContentItems] No content available"
         showNoContentState()
     end if
+end sub
+
+sub appendUserChannelsContent(contentItems as object)
+    print "DynamicContentScreen.brs - [appendUserChannelsContent] Appending content with " + contentItems.Count().ToStr() + " categories"
+    
+    if m.userChannelsGrid = invalid or m.userChannelsGridContent = invalid
+        print "DynamicContentScreen.brs - [appendUserChannelsContent] ERROR: Grid or content invalid"
+        return
+    end if
+    
+    ' contentItems is an array from convertUserChannelsToContentItems:
+    ' [ { "id": 14, "category": "User Channels", "contents": [...] } ]
+    ' The "contents" array has the channel items as associative arrays
+    
+    addedCount = 0
+    for each categoryData in contentItems
+        if categoryData <> invalid and categoryData.contents <> invalid
+            print "DynamicContentScreen.brs - [appendUserChannelsContent] Processing category with " + categoryData.contents.Count().ToStr() + " items"
+            
+            for each item in categoryData.contents
+                if item <> invalid
+                    ' Create a ContentNode for the item (same as buildUserChannelsGrid does via buildContentDisplay)
+                    itemNode = CreateObject("roSGNode", "ContentNode")
+                    
+                    ' Title
+                    if item.title <> invalid
+                        itemNode.title = item.title
+                    else
+                        itemNode.title = "Unknown Channel"
+                    end if
+                    
+                    ' Poster image
+                    if item.images <> invalid and item.images.poster <> invalid
+                        itemNode.hdPosterUrl = item.images.poster
+                    end if
+                    
+                    ' Description
+                    if item.description <> invalid
+                        itemNode.description = item.description
+                    end if
+                    
+                    ' Store the full API data for playback
+                    itemNode.addFields({ apiData: item })
+                    
+                    m.userChannelsGridContent.appendChild(itemNode)
+                    addedCount = addedCount + 1
+                end if
+            end for
+        end if
+    end for
+    
+    m.userChannelsLoadedItems = m.userChannelsLoadedItems + addedCount
+    print "DynamicContentScreen.brs - [appendUserChannelsContent] Added " + addedCount.ToStr() + " items. Total loaded: " + m.userChannelsLoadedItems.ToStr() + " of " + m.userChannelsTotalItems.ToStr()
+end sub
+
+sub loadMoreUserChannels()
+    ' Check if we're already loading or have loaded all pages
+    if m.userChannelsIsLoadingMore = true
+        print "DynamicContentScreen.brs - [loadMoreUserChannels] Already loading more, skipping"
+        return
+    end if
+    
+    if m.userChannelsCurrentPage >= m.userChannelsTotalPages
+        print "DynamicContentScreen.brs - [loadMoreUserChannels] All pages loaded (" + m.userChannelsCurrentPage.ToStr() + " of " + m.userChannelsTotalPages.ToStr() + ")"
+        return
+    end if
+    
+    m.userChannelsIsLoadingMore = true
+    m.userChannelsCurrentPage = m.userChannelsCurrentPage + 1
+    
+    print "DynamicContentScreen.brs - [loadMoreUserChannels] Loading page " + m.userChannelsCurrentPage.ToStr() + " of " + m.userChannelsTotalPages.ToStr()
+    
+    ' Create new API task for next page
+    if m.contentApi <> invalid
+        m.contentApi.unobserveField("responseData")
+        m.contentApi.unobserveField("contentItems")
+        m.contentApi = invalid
+    end if
+    
+    m.contentApi = createObject("roSGNode", "DynamicContentApi")
+    m.contentApi.observeField("responseData", "handleContentResponse")
+    m.contentApi.observeField("contentItems", "handleContentItems")
+    m.contentApi.contentTypeId = 14
+    m.contentApi.pageNumber = m.userChannelsCurrentPage
+    m.contentApi.control = "RUN"
 end sub
 
 sub buildContentDisplay(contentItems as object)
@@ -968,18 +1090,18 @@ end sub
 
 sub buildUserChannelsGrid(contentNode as object)
     print "DynamicContentScreen.brs - [buildUserChannelsGrid] Building User Channels GridView"
-    
+
     ' Get the grid reference
     m.userChannelsGrid = m.top.findNode("userChannelsGrid")
     if m.userChannelsGrid = invalid
         print "DynamicContentScreen.brs - [buildUserChannelsGrid] ERROR: userChannelsGrid not found!"
         return
     end if
-    
+
     ' Flatten all items from all categories into a single grid
     gridContent = CreateObject("roSGNode", "ContentNode")
     totalItems = 0
-    
+
     for i = 0 to contentNode.getChildCount() - 1
         rowNode = contentNode.getChild(i)
         if rowNode <> invalid
@@ -1000,9 +1122,15 @@ sub buildUserChannelsGrid(contentNode as object)
             end for
         end if
     end for
-    
+
     print "DynamicContentScreen.brs - [buildUserChannelsGrid] Added " + totalItems.ToStr() + " items to grid"
     
+    ' Store reference for pagination appending
+    m.userChannelsGridContent = gridContent
+    m.userChannelsLoadedItems = totalItems
+    
+    print "DynamicContentScreen.brs - [buildUserChannelsGrid] Pagination status: Page " + m.userChannelsCurrentPage.ToStr() + "/" + m.userChannelsTotalPages.ToStr() + ", " + m.userChannelsLoadedItems.ToStr() + "/" + m.userChannelsTotalItems.ToStr() + " items"
+
     ' Set content to grid
     m.userChannelsGrid.content = gridContent
     print "DynamicContentScreen.brs - [buildUserChannelsGrid] Grid content set"
@@ -1045,7 +1173,18 @@ end sub
 sub onGridItemFocused()
     if m.userChannelsGrid <> invalid
         itemFocused = m.userChannelsGrid.itemFocused
-        print "DynamicContentScreen.brs - [onGridItemFocused] Grid item focused: " + itemFocused.ToStr()
+        
+        ' Auto-load more items when approaching the end (within last 10 items)
+        if m.userChannelsGridContent <> invalid
+            totalLoaded = m.userChannelsGridContent.getChildCount()
+            triggerIndex = totalLoaded - 10
+            if triggerIndex < 0 then triggerIndex = 0
+            
+            if itemFocused >= triggerIndex and m.userChannelsCurrentPage < m.userChannelsTotalPages
+                print "DynamicContentScreen.brs - [onGridItemFocused] Near end of loaded items, loading more..."
+                loadMoreUserChannels()
+            end if
+        end if
     end if
 end sub
 

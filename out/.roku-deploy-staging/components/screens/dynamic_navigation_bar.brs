@@ -355,6 +355,7 @@ sub onTVGuideError()
 end sub
 
 function RetrieveAuthDataForTVGuide() as object
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] =========================================="
     print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Reading auth data from registry"
     
     ' Read from AUTH section, authData key (same as NavigationApi)
@@ -366,7 +367,7 @@ function RetrieveAuthDataForTVGuide() as object
     end if
     
     if not sec.Exists("authData")
-        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] authData key does not exist"
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] authData key does not exist in registry"
         return invalid
     end if
     
@@ -376,7 +377,8 @@ function RetrieveAuthDataForTVGuide() as object
         return invalid
     end if
     
-    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Read authData, length: " + jsonData.Len().ToStr()
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Raw authData JSON: " + jsonData
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] JSON length: " + jsonData.Len().ToStr()
     
     data = ParseJson(jsonData)
     if data = invalid
@@ -384,19 +386,40 @@ function RetrieveAuthDataForTVGuide() as object
         return invalid
     end if
     
+    ' Log all fields in the parsed data
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Parsed auth data fields:"
+    if data.accessToken <> invalid
+        tokenLen = Len(data.accessToken)
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide]   accessToken length: " + tokenLen.ToStr()
+    end if
+    if data.isauth <> invalid
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide]   isauth: " + data.isauth.ToStr() + " (type: " + Type(data.isauth) + ")"
+    end if
+    if data.subscribed <> invalid
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide]   subscribed: " + data.subscribed.ToStr()
+    end if
+    if data.expiry <> invalid
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide]   expiry: " + data.expiry.ToStr()
+    end if
+    
     ' Check if token is expired
     currentTime = CreateObject("roDateTime").asSeconds()
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Current time: " + currentTime.ToStr()
+    
     if data.expiry <> invalid and currentTime > data.expiry
-        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Auth token expired"
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] *** AUTH TOKEN EXPIRED ***"
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Expired " + (currentTime - data.expiry).ToStr() + " seconds ago"
         return invalid
     end if
     
     if data.accessToken <> invalid and data.accessToken <> ""
-        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] Valid auth data found"
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] *** VALID AUTH DATA FOUND ***"
+        print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] =========================================="
         return data
     end if
     
-    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] No accessToken in auth data"
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] No valid accessToken in auth data"
+    print "DynamicNavigationBar.brs - [RetrieveAuthDataForTVGuide] =========================================="
     return invalid
 end function
 
@@ -469,16 +492,49 @@ function filterNavByAuth(navData as object) as object
     ' Filter out authenticated-only tabs (Age Restricted=15, Personal=16)
     ' User Channels (14) is now shown for all users
     ' if the user is not authenticated
+    print "DynamicNavigationBar.brs - [filterNavByAuth] ========== AUTH CHECK =========="
     print "DynamicNavigationBar.brs - [filterNavByAuth] Checking auth status..."
     
     isAuthenticated = false
     authData = RetrieveAuthDataForTVGuide()
+    
+    ' Detailed auth data logging
+    if authData <> invalid
+        print "DynamicNavigationBar.brs - [filterNavByAuth] authData found:"
+        if authData.accessToken <> invalid
+            tokenPreview = Left(authData.accessToken, 20)
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   accessToken: " + tokenPreview + "..."
+        else
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   accessToken: INVALID/NULL"
+        end if
+        if authData.isauth <> invalid
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   isauth: " + authData.isauth.ToStr()
+        else
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   isauth: INVALID/NULL"
+        end if
+        if authData.expiry <> invalid
+            currentTime = CreateObject("roDateTime").asSeconds()
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   expiry: " + authData.expiry.ToStr() + " (current: " + currentTime.ToStr() + ")"
+            if currentTime > authData.expiry
+                print "DynamicNavigationBar.brs - [filterNavByAuth]   *** TOKEN EXPIRED ***"
+            end if
+        else
+            print "DynamicNavigationBar.brs - [filterNavByAuth]   expiry: INVALID/NULL"
+        end if
+    else
+        print "DynamicNavigationBar.brs - [filterNavByAuth] authData is INVALID/NULL"
+    end if
+    
+    ' Check authentication - need BOTH accessToken AND isauth=1
     if authData <> invalid and authData.accessToken <> invalid and authData.accessToken <> ""
         if authData.isauth <> invalid and authData.isauth = 1
             isAuthenticated = true
+        else
+            print "DynamicNavigationBar.brs - [filterNavByAuth] WARNING: Has token but isauth is not 1"
         end if
     end if
-    print "DynamicNavigationBar.brs - [filterNavByAuth] User authenticated: " + isAuthenticated.ToStr()
+    print "DynamicNavigationBar.brs - [filterNavByAuth] *** FINAL AUTH STATUS: " + isAuthenticated.ToStr() + " ***"
+    print "DynamicNavigationBar.brs - [filterNavByAuth] ================================"
     
     if isAuthenticated
         print "DynamicNavigationBar.brs - [filterNavByAuth] Authenticated - keeping all items"
