@@ -1,4 +1,10 @@
 sub init()
+    ' ==================== TV GUIDE VERSION CONTROL ====================
+    ' Set to true to use new Channel Browser layout (V2)
+    ' Set to false to use original TimeGrid layout (V1)
+    m.useTVGuideV2 = true
+    ' ==================================================================
+    
     m.background = m.top.findNode("background")
     m.headerTitle = m.top.findNode("headerTitle")
     m.headerTime = m.top.findNode("headerTime")
@@ -15,6 +21,7 @@ sub init()
     m.timeGrid = m.top.findNode("timeGrid")
 
     m.loadingGroup = m.top.findNode("loadingGroup")
+    m.v2LoadingGroup = m.top.findNode("v2LoadingGroup")
     m.noContentLabel = m.top.findNode("noContentLabel")
 
     ' Channel logo and program details
@@ -105,6 +112,12 @@ sub init()
     m.timeTimer.duration = 60 ' Update every minute
     m.timeTimer.observeField("fire", "onTimeUpdate")
     m.timeTimer.control = "start"
+    
+    ' ==================== TV GUIDE V2 INITIALIZATION ====================
+    if m.useTVGuideV2 = true
+        initTVGuideV2()
+    end if
+    ' ====================================================================
 end sub
 
 sub buildDaySelector()
@@ -232,7 +245,9 @@ sub onTVGuideDataReceived()
     
     responseData = m.tvGuideApiTask.responseData
     if responseData = invalid or responseData = ""
-        m.noContentLabel.visible = true
+        if m.noContentLabel <> invalid then
+            m.noContentLabel.visible = true
+        end if
         hideLoading()
         return
     end if
@@ -240,7 +255,9 @@ sub onTVGuideDataReceived()
     parsedData = ParseJson(responseData)
     if parsedData = invalid
         print "TVGuideScreen.brs - ERROR: Failed to parse JSON"
-        m.noContentLabel.visible = true
+        if m.noContentLabel <> invalid then
+            m.noContentLabel.visible = true
+        end if
         hideLoading()
         return
     end if
@@ -251,7 +268,9 @@ end sub
 
 sub onTVGuideError()
     print "TVGuideScreen.brs - ERROR: " + m.tvGuideApiTask.errorMessage
-    m.noContentLabel.visible = true
+    if m.noContentLabel <> invalid then
+        m.noContentLabel.visible = true
+    end if
     hideLoading()
 end sub
 
@@ -283,6 +302,22 @@ end sub
 sub onExplicitFocusRequested()
     print "TVGuideScreen.brs - [onExplicitFocusRequested] Explicit focus requested"
     if m.top.explicitContentFocusRequested > 0
+        ' V2 handling
+        if m.useTVGuideV2 = true
+            ' Restore focus to the area that had it before (programs or channels)
+            if m.v2FocusArea = "programs" and m.v2ProgramRow <> invalid
+                m.v2ProgramRow.setFocus(true)
+                print "TVGuideScreen.brs - [onExplicitFocusRequested] V2 Program row focused (restored)"
+            else if m.v2ChannelList <> invalid
+                m.v2ChannelList.setFocus(true)
+                m.v2FocusArea = "channels"
+                print "TVGuideScreen.brs - [onExplicitFocusRequested] V2 Channel list focused"
+            end if
+            m.top.explicitContentFocusRequested = 0
+            return
+        end if
+        
+        ' V1 handling (original)
         if m.timeGrid <> invalid
             m.timeGridHasBeenFocused = true
             m.focusArea = "timegrid"
@@ -706,12 +741,46 @@ sub playChannelPreview(channel as object, program as object)
         return
     end if
     
+    ' Parse URL for credentials
+    urlParts = parseUrlCredentials(streamUrl)
+    finalUrl = streamUrl
+    if urlParts.hasCredentials
+        finalUrl = urlParts.cleanUrl
+    end if
+    
+    ' Detect stream format
+    detectedFormat = detectStreamFormat(finalUrl)
+    
+    ' For MPEG-TS with credentials, attach roHttpAgent
+    if m.videoPlayer <> invalid and detectedFormat = "ts" and urlParts.hasCredentials
+        agent = CreateObject("roHttpAgent")
+        agent.AddHeader("Authorization", "Basic " + urlParts.basicAuth)
+        m.videoPlayer.SetHttpAgent(agent)
+    end if
+
     ' Create content node for video
     videoContent = CreateObject("roSGNode", "ContentNode")
-    videoContent.url = streamUrl
+    videoContent.url = finalUrl
     videoContent.title = channelTitle
-    videoContent.streamFormat = "hls"
+
+    ' Set stream format (both variants)
+    if detectedFormat <> "" then
+        videoContent.streamformat = detectedFormat
+        videoContent.StreamFormat = detectedFormat
+    end if
+
+    ' Disable transcoding for TV Guide streams
+    videoContent.live = true
+    videoContent.Live = true
     
+    ' MPEG-TS specific
+    if detectedFormat = "ts"
+        videoContent.StreamStickyHttpRedirects = [true]
+        if urlParts.hasCredentials
+            videoContent.HttpHeaders = ["Authorization:Basic " + urlParts.basicAuth]
+        end if
+    end if
+
     ' Set content and play
     m.videoPlayer.content = videoContent
     m.videoPlayer.control = "play"
@@ -972,31 +1041,54 @@ sub onTimeUpdate()
 end sub
 
 sub showLoading()
-    if m.loadingGroup <> invalid
-        m.loadingGroup.visible = true
+    if m.useTVGuideV2 = true
+        if m.v2LoadingGroup <> invalid
+            m.v2LoadingGroup.visible = true
+        end if
+    else
+        if m.loadingGroup <> invalid
+            m.loadingGroup.visible = true
+        end if
     end if
 end sub
 
 sub hideLoading()
-    if m.loadingGroup <> invalid
-        m.loadingGroup.visible = false
+    if m.useTVGuideV2 = true
+        if m.v2LoadingGroup <> invalid
+            m.v2LoadingGroup.visible = false
+        end if
+    else
+        if m.loadingGroup <> invalid
+            m.loadingGroup.visible = false
+        end if
     end if
 end sub
 
 sub loadTVGuideData(tvGuideData as object)
+    ' Route to appropriate version
+    if m.useTVGuideV2 = true
+        loadTVGuideDataV2(tvGuideData)
+        return
+    end if
+    
+    ' V1 Logic (original)
     if tvGuideData = invalid
-        m.noContentLabel.visible = true
+        if m.noContentLabel <> invalid then
+            m.noContentLabel.visible = true
+        end if
         hideLoading()
         return
     end if
     
-    if tvGuideData.Count() = 0
-        m.noContentLabel.visible = true
+    if Type(tvGuideData) <> "roArray" or tvGuideData.Count() = 0
+        if m.noContentLabel <> invalid then
+            m.noContentLabel.visible = true
+        end if
         hideLoading()
         return
     end if
     
-    if tvGuideData.Count() = 1 and tvGuideData[0].contents <> invalid
+    if tvGuideData.Count() = 1 and tvGuideData[0] <> invalid and tvGuideData[0].contents <> invalid
         m.channelsData = tvGuideData[0].contents
     else
         m.channelsData = tvGuideData
@@ -1615,7 +1707,12 @@ sub updateCurrentTimeIndicator()
 end sub
 
 function onKeyEvent(key as string, press as boolean) as boolean
+    ' Route to V2 if enabled
+    if m.useTVGuideV2 = true
+        return onKeyEventV2(key, press)
+    end if
     
+    ' V1 Logic (original)
     if not press then return false
     
     if key = "up"
@@ -1765,11 +1862,45 @@ sub playChannel(channel as object)
     if streamUrl = "" then return
     
     if m.videoPlayer <> invalid
-        videoContent = CreateObject("roSGNode", "ContentNode")
-        videoContent.url = streamUrl
-        videoContent.title = channelTitle
-        videoContent.streamFormat = "hls"
+        ' Parse URL for credentials
+        urlParts = parseUrlCredentials(streamUrl)
+        finalUrl = streamUrl
+        if urlParts.hasCredentials
+            finalUrl = urlParts.cleanUrl
+        end if
         
+        ' Detect stream format
+        detectedFormat = detectStreamFormat(finalUrl)
+        
+        ' For MPEG-TS with credentials, attach roHttpAgent
+        if detectedFormat = "ts" and urlParts.hasCredentials
+            agent = CreateObject("roHttpAgent")
+            agent.AddHeader("Authorization", "Basic " + urlParts.basicAuth)
+            m.videoPlayer.SetHttpAgent(agent)
+        end if
+        
+        videoContent = CreateObject("roSGNode", "ContentNode")
+        videoContent.url = finalUrl
+        videoContent.title = channelTitle
+
+        ' Set stream format (both variants)
+        if detectedFormat <> "" then
+            videoContent.streamformat = detectedFormat
+            videoContent.StreamFormat = detectedFormat
+        end if
+
+        ' Disable transcoding for TV Guide streams
+        videoContent.live = true
+        videoContent.Live = true
+        
+        ' MPEG-TS specific
+        if detectedFormat = "ts"
+            videoContent.StreamStickyHttpRedirects = [true]
+            if urlParts.hasCredentials
+                videoContent.HttpHeaders = ["Authorization:Basic " + urlParts.basicAuth]
+            end if
+        end if
+
         m.videoPlayer.content = videoContent
         m.videoPlayer.control = "play"
         
@@ -1838,4 +1969,766 @@ sub updateClockDisplay()
     if m.screenTimeLabel <> invalid
         m.screenTimeLabel.text = timeStr
     end if
+end sub
+
+' ############################################################################
+' ######################### TV GUIDE V2 IMPLEMENTATION #######################
+' ############################################################################
+
+sub initTVGuideV2()
+    print "TVGuideScreen.brs - [initTVGuideV2] *** Initializing TV Guide V2 (Channel Browser) ***"
+    
+    ' Hide TimeGrid and related V1 components
+    if m.timeGrid <> invalid
+        m.timeGrid.visible = false
+    end if
+    if m.daySelector <> invalid
+        m.daySelector.visible = false
+    end if
+    if m.channelLogoGroup <> invalid
+        m.channelLogoGroup.visible = false
+    end if
+    if m.programDetailsGroup <> invalid
+        m.programDetailsGroup.visible = false
+    end if
+    if m.backHintGroup <> invalid
+        m.backHintGroup.visible = false
+    end if
+    
+    ' Get V2 UI components
+    m.v2ChannelList = m.top.findNode("v2ChannelList")
+    m.v2ProgramRow = m.top.findNode("v2ProgramRow")
+    m.v2VideoPreview = m.top.findNode("v2VideoPreview")
+    m.v2VideoPlayer = m.top.findNode("v2VideoPlayer")
+    m.v2VideoStatus = m.top.findNode("v2VideoStatus")
+    m.v2ProgramTimeLabel = m.top.findNode("v2ProgramTimeLabel")
+    m.v2NavigationHint = m.top.findNode("v2NavigationHint")
+    
+    ' Set up observers for V2 components
+    if m.v2ChannelList <> invalid
+        m.v2ChannelList.observeField("itemFocused", "onV2ChannelFocused")
+        m.v2ChannelList.observeField("itemSelected", "onV2ChannelSelected")
+    end if
+    
+    if m.v2ProgramRow <> invalid
+        m.v2ProgramRow.observeField("rowItemFocused", "onV2ProgramFocused")
+        m.v2ProgramRow.observeField("rowItemSelected", "onV2ProgramSelected")
+    end if
+    
+    if m.v2VideoPlayer <> invalid
+        m.v2VideoPlayer.observeField("state", "onV2VideoStateChanged")
+    end if
+    
+    ' V2 focus state tracking
+    m.v2FocusArea = "channels" ' "channels" or "programs"
+    m.v2CurrentChannelIndex = 0
+    m.v2CurrentProgramIndex = 0
+    m.v2CurrentlyPlayingChannelIndex = -1
+    m.v2CurrentlyPlayingProgramIndex = -1
+    
+    print "TVGuideScreen.brs - [initTVGuideV2] V2 initialization complete"
+end sub
+
+sub loadTVGuideDataV2(tvGuideData as object)
+    print "TVGuideScreen.brs - [loadTVGuideDataV2] Loading data for V2"
+
+    if tvGuideData = invalid or Type(tvGuideData) <> "roArray" or tvGuideData.Count() = 0
+        print "TVGuideScreen.brs - [loadTVGuideDataV2] No data available"
+        if m.noContentLabel <> invalid then
+            m.noContentLabel.visible = true
+        end if
+        hideLoading()
+        return
+    end if
+
+    ' Extract channels data (same as V1)
+    if tvGuideData.Count() = 1 and tvGuideData[0] <> invalid and tvGuideData[0].contents <> invalid
+        m.channelsData = tvGuideData[0].contents
+    else
+        m.channelsData = tvGuideData
+    end if
+
+    print "TVGuideScreen.brs - [loadTVGuideDataV2] Channels loaded: " + m.channelsData.Count().ToStr()
+
+    ' Build V2 UI
+    buildV2ChannelList()
+    
+    ' Load first channel's programs immediately
+    if m.channelsData.Count() > 0
+        print "TVGuideScreen.brs - [loadTVGuideDataV2] Loading first channel's programs"
+        buildV2ProgramRow(0)
+        m.v2CurrentChannelIndex = 0
+    end if
+    
+    hideLoading()
+
+    ' DON'T set initial focus here - let navigation handle it
+    ' Initial focus should only happen when explicitly requested
+    m.v2FocusArea = "channels"
+end sub
+
+sub buildV2ChannelList()
+    if m.v2ChannelList = invalid or m.channelsData = invalid or m.channelsData.Count() = 0
+        print "TVGuideScreen.brs - [buildV2ChannelList] ERROR: Missing components or data"
+        return
+    end if
+    
+    print "TVGuideScreen.brs - [buildV2ChannelList] Building channel list with " + m.channelsData.Count().ToStr() + " channels"
+    
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    
+    for channelIdx = 0 to m.channelsData.Count() - 1
+        channel = m.channelsData[channelIdx]
+        if channel = invalid then continue for
+        
+        channelNode = CreateObject("roSGNode", "ContentNode")
+        
+        ' Get channel title
+        channelTitle = "Unknown Channel"
+        if channel.title <> invalid and channel.title <> ""
+            channelTitle = channel.title
+        else if channel.name <> invalid and channel.name <> ""
+            channelTitle = channel.name
+        end if
+        channelNode.title = channelTitle
+
+        ' Get channel logo
+        logoUrl = ""
+        if channel.logo <> invalid and channel.logo <> ""
+            logoUrl = channel.logo
+        else if channel.icon <> invalid and channel.icon <> ""
+            if Left(channel.icon, 4) = "http"
+                logoUrl = channel.icon
+            else
+                logoUrl = "https://giatv.dineo.uk" + channel.icon
+            end if
+        else if channel.images <> invalid
+            if channel.images.poster <> invalid and channel.images.poster <> ""
+                logoUrl = channel.images.poster
+            else if channel.images.thumbnail <> invalid and channel.images.thumbnail <> ""
+                logoUrl = channel.images.thumbnail
+            end if
+        end if
+
+        if logoUrl <> ""
+            channelNode.HDPosterUrl = logoUrl
+            channelNode.hdPosterUrl = logoUrl
+        end if
+
+        ' Store channel index for later reference
+        channelNode.addFields({ channelDataIndex: channelIdx })
+
+        ' Debug first 3 channels
+        if channelIdx < 3
+            print "TVGuideScreen.brs - [buildV2ChannelList] Channel " + channelIdx.ToStr() + ":"
+            print "  Title: " + channelTitle
+            print "  Logo: " + logoUrl
+            print "  channelNode.title: " + channelNode.title
+        end if
+
+        contentNode.appendChild(channelNode)
+    end for
+    
+    m.v2ChannelList.content = contentNode
+    
+    print "TVGuideScreen.brs - [buildV2ChannelList] Channel list built successfully"
+end sub
+
+sub onV2ChannelFocused()
+    if m.v2ChannelList = invalid then return
+
+    focusedIndex = m.v2ChannelList.itemFocused
+    if focusedIndex = invalid or focusedIndex < 0 then return
+
+    m.v2CurrentChannelIndex = focusedIndex
+    
+    ' Ensure focus area is set to channels
+    m.v2FocusArea = "channels"
+
+    print "TVGuideScreen.brs - [onV2ChannelFocused] Channel focused: " + focusedIndex.ToStr() + ", Focus area: " + m.v2FocusArea
+
+    ' Build program row for this channel
+    buildV2ProgramRow(focusedIndex)
+end sub
+
+sub onV2ChannelSelected()
+    ' Channel selected - move focus to program row
+    print "TVGuideScreen.brs - [onV2ChannelSelected] Channel selected, moving to programs"
+    ' This will be handled by onKeyEvent when RIGHT is pressed
+end sub
+
+sub buildV2ProgramRow(channelIndex as integer)
+    if m.v2ProgramRow = invalid or m.channelsData = invalid then return
+    if channelIndex < 0 or channelIndex >= m.channelsData.Count() then return
+    
+    channel = m.channelsData[channelIndex]
+    if channel = invalid then return
+    
+    print "TVGuideScreen.brs - [buildV2ProgramRow] Building program row for channel " + channelIndex.ToStr()
+    
+    ' Get shows for this channel
+    shows = channel.shows
+    if shows = invalid or shows.Count() = 0
+        print "TVGuideScreen.brs - [buildV2ProgramRow] No programs available for this channel"
+        ' Show empty state - still needs row structure for RowList
+        contentNode = CreateObject("roSGNode", "ContentNode")
+        rowNode = contentNode.createChild("ContentNode")
+        emptyNode = rowNode.createChild("ContentNode")
+        emptyNode.title = "No Program Information"
+        emptyNode.description = ""
+        m.v2ProgramRow.content = contentNode
+        print "TVGuideScreen.brs - [buildV2ProgramRow] Set empty program row"
+        return
+    end if
+    
+    ' Get current time to find "now"
+    dateTimeUTC = CreateObject("roDateTime")
+    dateTimeLocal = CreateObject("roDateTime")
+    dateTimeLocal.ToLocalTime()
+    
+    currentSecondsUTC = dateTimeUTC.AsSeconds()
+    currentSecondsLocal = dateTimeLocal.AsSeconds()
+    
+    ' Build program list for RowList (needs a row with items)
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    rowNode = contentNode.createChild("ContentNode")
+    
+    currentProgramIndex = -1
+    programCount = 0
+    
+    for i = 0 to shows.Count() - 1
+        show = shows[i]
+        if show = invalid then continue for
+        
+        programNode = rowNode.createChild("ContentNode")
+        
+        ' Program title
+        programTitle = "Program"
+        if show.name <> invalid and show.name <> ""
+            programTitle = show.name
+        end if
+        programNode.title = programTitle
+        
+        ' Program description
+        programDesc = ""
+        if show.longdescription <> invalid and show.longdescription <> ""
+            programDesc = show.longdescription
+        else if show.description <> invalid and show.description <> ""
+            programDesc = show.description
+        end if
+        programNode.description = programDesc
+        
+        ' Program time information
+        if show.start <> invalid and show.end <> invalid
+            programNode.addFields({
+                startTime: show.start,
+                endTime: show.end
+            })
+            
+            ' Check if this is the current program
+            startParts = show.start.Split(":")
+            endParts = show.end.Split(":")
+            
+            if startParts.Count() >= 2 and endParts.Count() >= 2
+                startHour = Val(startParts[0])
+                startMin = Val(startParts[1])
+                endHour = Val(endParts[0])
+                endMin = Val(endParts[1])
+                
+                ' Calculate program time in seconds (simplified - assumes same day)
+                currentHour = dateTimeLocal.GetHours()
+                currentMin = dateTimeLocal.GetMinutes()
+                currentTotalMin = currentHour * 60 + currentMin
+                programStartMin = startHour * 60 + startMin
+                programEndMin = endHour * 60 + endMin
+                
+                ' Handle midnight crossover
+                if programEndMin < programStartMin
+                    programEndMin = programEndMin + 1440
+                end if
+                
+                ' Check if current time is within this program
+                if currentTotalMin >= programStartMin and currentTotalMin < programEndMin
+                    currentProgramIndex = programCount
+                    print "TVGuideScreen.brs - [buildV2ProgramRow] Found current program at index " + programCount.ToStr()
+                end if
+            end if
+        end if
+        
+        ' Store original show index
+        programNode.addFields({ originalShowIndex: i })
+        
+        programCount = programCount + 1
+    end for
+    
+    m.v2ProgramRow.content = contentNode
+    
+    print "TVGuideScreen.brs - [buildV2ProgramRow] RowList content set, program count: " + programCount.ToStr()
+    
+    ' Jump to current program if found (RowList uses rowItemFocused for column position)
+    if currentProgramIndex >= 0
+        m.v2ProgramRow.jumpToRowItem = [0, currentProgramIndex]
+        m.v2CurrentProgramIndex = currentProgramIndex
+        print "TVGuideScreen.brs - [buildV2ProgramRow] Jumped to current program at index " + currentProgramIndex.ToStr()
+    else
+        m.v2ProgramRow.jumpToRowItem = [0, 0]
+        m.v2CurrentProgramIndex = 0
+        print "TVGuideScreen.brs - [buildV2ProgramRow] Starting at first program"
+    end if
+    
+    ' Update program time display
+    updateV2ProgramTimeDisplay()
+    
+    print "TVGuideScreen.brs - [buildV2ProgramRow] Program row built successfully with " + programCount.ToStr() + " programs"
+end sub
+
+sub onV2ProgramFocused()
+    if m.v2ProgramRow = invalid then return
+    
+    ' RowList uses rowItemFocused which returns [row, item]
+    focusedItem = m.v2ProgramRow.rowItemFocused
+    if focusedItem = invalid or focusedItem.Count() < 2 then return
+    
+    focusedIndex = focusedItem[1] ' Column index (item within row)
+    if focusedIndex < 0 then return
+    
+    m.v2CurrentProgramIndex = focusedIndex
+    
+    ' Ensure focus area is set to programs
+    m.v2FocusArea = "programs"
+    
+    print "TVGuideScreen.brs - [onV2ProgramFocused] Program focused: " + focusedIndex.ToStr() + ", Focus area: " + m.v2FocusArea
+    
+    ' Update program time display
+    updateV2ProgramTimeDisplay()
+end sub
+
+sub onV2ProgramSelected()
+    if m.v2ProgramRow = invalid or m.channelsData = invalid then return
+    
+    ' RowList uses rowItemSelected which returns [row, item]
+    selectedItem = m.v2ProgramRow.rowItemSelected
+    if selectedItem = invalid or selectedItem.Count() < 2 then return
+    
+    programIndex = selectedItem[1] ' Column index (item within row)
+    channelIndex = m.v2CurrentChannelIndex
+    
+    print "TVGuideScreen.brs - [onV2ProgramSelected] =========================================="
+    print "TVGuideScreen.brs - [onV2ProgramSelected] Program selected: Channel " + channelIndex.ToStr() + ", Program " + programIndex.ToStr()
+    print "TVGuideScreen.brs - [onV2ProgramSelected] Currently playing: Channel " + m.v2CurrentlyPlayingChannelIndex.ToStr() + ", Program " + m.v2CurrentlyPlayingProgramIndex.ToStr()
+    
+    if programIndex = invalid or programIndex < 0 then return
+    if channelIndex < 0 or channelIndex >= m.channelsData.Count() then return
+    
+    ' Check if this is the same program already playing
+    isSameProgram = (channelIndex = m.v2CurrentlyPlayingChannelIndex and programIndex = m.v2CurrentlyPlayingProgramIndex)
+    
+    if isSameProgram
+        print "TVGuideScreen.brs - [onV2ProgramSelected] *** SAME PROGRAM - Opening full screen ***"
+        playV2ProgramFullScreen(channelIndex, programIndex)
+    else
+        print "TVGuideScreen.brs - [onV2ProgramSelected] *** DIFFERENT PROGRAM - Playing in preview ***"
+        playV2ProgramPreview(channelIndex, programIndex)
+        m.v2CurrentlyPlayingChannelIndex = channelIndex
+        m.v2CurrentlyPlayingProgramIndex = programIndex
+    end if
+    
+    print "TVGuideScreen.brs - [onV2ProgramSelected] =========================================="
+end sub
+
+function parseUrlCredentials(url as string) as object
+    ' Extract credentials from URL like http://user:pass@host:port/path
+    result = {
+        originalUrl: url
+        cleanUrl: url
+        username: ""
+        password: ""
+        hasCredentials: false
+        basicAuth: ""
+    }
+    
+    if url = invalid or url = "" then return result
+    
+    schemePos = Instr(1, url, "://")
+    atPos = Instr(1, url, "@")
+    
+    if schemePos > 0 and atPos > schemePos + 3
+        afterSchemePos = schemePos + 3
+        afterScheme = Mid(url, afterSchemePos)
+        slashPos = Instr(1, afterScheme, "/")
+        
+        atIsInAuthority = true
+        if slashPos > 0
+            slashAbs = afterSchemePos + slashPos - 1
+            if slashAbs < atPos then atIsInAuthority = false
+        end if
+        
+        if atIsInAuthority
+            userInfo = Mid(url, afterSchemePos, atPos - afterSchemePos)
+            colonPos = Instr(1, userInfo, ":")
+            if colonPos > 0
+                result.username = Left(userInfo, colonPos - 1)
+                result.password = Mid(userInfo, colonPos + 1)
+                result.cleanUrl = Left(url, afterSchemePos - 1) + Mid(url, atPos + 1)
+                result.hasCredentials = true
+                
+                ' Create Base64 Basic Auth
+                bytes = CreateObject("roByteArray")
+                bytes.FromAsciiString(result.username + ":" + result.password)
+                result.basicAuth = bytes.ToBase64String()
+                
+                print "TVGuideScreen.brs - [parseUrlCredentials] Extracted credentials"
+            end if
+        end if
+    end if
+    
+    return result
+end function
+
+function detectStreamFormat(url as string) as string
+    ' Detect stream format from URL extension
+    ' Supports: HLS (.m3u8), MPEG-TS (.ts), MP4 (.mp4), and others
+    
+    if url = invalid or url = "" then
+        print "TVGuideScreen.brs - [detectStreamFormat] Invalid URL, defaulting to hls"
+        return "hls"
+    end if
+    
+    ' Convert to lowercase for case-insensitive comparison
+    urlLower = LCase(url)
+    
+    ' Check for .ts extension (MPEG-TS streams)
+    ' Note: Many IPTV providers use .ts URLs - use 'ts' format explicitly
+    if Instr(1, urlLower, ".ts") > 0
+        ' Check if this looks like an HLS segment (has m3u8 in path or chunklist/segment pattern)
+        if Instr(1, urlLower, "m3u8") > 0 or Instr(1, urlLower, "chunklist") > 0 or Instr(1, urlLower, "segment") > 0
+            print "TVGuideScreen.brs - [detectStreamFormat] Detected HLS stream with .ts segments"
+            return "hls"
+        ' For all other .ts files (including IPTV), use explicit 'ts' format
+        else
+            print "TVGuideScreen.brs - [detectStreamFormat] Detected MPEG-TS stream (.ts) - using 'ts' format"
+            return "ts"
+        end if
+    end if
+    
+    ' Check for .m3u8 (HLS)
+    if Instr(1, urlLower, ".m3u8") > 0
+        print "TVGuideScreen.brs - [detectStreamFormat] Detected HLS stream (.m3u8)"
+        return "hls"
+    end if
+    
+    ' Check for .mp4
+    if Instr(1, urlLower, ".mp4") > 0
+        print "TVGuideScreen.brs - [detectStreamFormat] Detected MP4 stream (.mp4)"
+        return "mp4"
+    end if
+    
+    ' Check for .mkv
+    if Instr(1, urlLower, ".mkv") > 0
+        print "TVGuideScreen.brs - [detectStreamFormat] Detected MKV stream (.mkv)"
+        return "mkv"
+    end if
+    
+    ' Check for DASH manifest
+    if Instr(1, urlLower, ".mpd") > 0
+        print "TVGuideScreen.brs - [detectStreamFormat] Detected DASH stream (.mpd)"
+        return "dash"
+    end if
+    
+    ' Check for ISM (Smooth Streaming)
+    if Instr(1, urlLower, ".ism") > 0 or Instr(1, urlLower, "/manifest") > 0
+        print "TVGuideScreen.brs - [detectStreamFormat] Detected Smooth Streaming (.ism)"
+        return "ism"
+    end if
+    
+    ' Default to HLS if no match
+    print "TVGuideScreen.brs - [detectStreamFormat] No specific format detected, defaulting to hls for URL: " + url
+    return "hls"
+end function
+
+sub playV2ProgramPreview(channelIndex as integer, programIndex as integer)
+    if m.v2VideoPlayer = invalid or m.channelsData = invalid then return
+    if channelIndex < 0 or channelIndex >= m.channelsData.Count() then return
+
+    channel = m.channelsData[channelIndex]
+    if channel = invalid then return
+
+    print "TVGuideScreen.brs - [playV2ProgramPreview] Playing preview for channel " + channelIndex.ToStr()
+
+    ' Get stream URL
+    streamUrl = getChannelStreamUrl(channel, programIndex)
+
+    if streamUrl = "" or streamUrl = invalid
+        print "TVGuideScreen.brs - [playV2ProgramPreview] ERROR: No stream URL available"
+        if m.v2VideoStatus <> invalid
+            m.v2VideoStatus.text = "Stream not available"
+            m.v2VideoStatus.visible = true
+        end if
+        return
+    end if
+
+    ' Get channel title
+    channelTitle = "Live TV"
+    if channel.title <> invalid and channel.title <> ""
+        channelTitle = channel.title
+    else if channel.name <> invalid and channel.name <> ""
+        channelTitle = channel.name
+    end if
+
+    ' Parse URL for credentials
+    urlParts = parseUrlCredentials(streamUrl)
+    finalUrl = streamUrl
+    if urlParts.hasCredentials
+        finalUrl = urlParts.cleanUrl
+        print "TVGuideScreen.brs - [playV2ProgramPreview] Using clean URL with Basic Auth"
+    end if
+    
+    ' Detect stream format
+    detectedFormat = detectStreamFormat(finalUrl)
+    
+    ' For MPEG-TS with credentials, attach roHttpAgent BEFORE creating content
+    if m.v2VideoPlayer <> invalid and detectedFormat = "ts" and urlParts.hasCredentials
+        agent = CreateObject("roHttpAgent")
+        authHeader = "Basic " + urlParts.basicAuth
+        agent.AddHeader("Authorization", authHeader)
+        m.v2VideoPlayer.SetHttpAgent(agent)
+        print "TVGuideScreen.brs - [playV2ProgramPreview] Attached roHttpAgent with Basic Auth"
+    end if
+
+    ' Create video content
+    videoContent = CreateObject("roSGNode", "ContentNode")
+    videoContent.url = finalUrl
+    videoContent.title = channelTitle
+    
+    ' Set stream format (both variants for compatibility)
+    if detectedFormat <> "" then
+        videoContent.streamformat = detectedFormat
+        videoContent.StreamFormat = detectedFormat
+    end if
+    
+    ' Disable transcoding for TV Guide streams (all are live)
+    videoContent.live = true
+    videoContent.Live = true
+    
+    ' MPEG-TS specific properties
+    if detectedFormat = "ts"
+        videoContent.StreamStickyHttpRedirects = [true]
+        ' Be lenient with malformed metadata in MPEG-TS streams
+        videoContent.IgnoreStreamErrors = true
+        ' Disable trick play to reduce parsing strictness
+        videoContent.EnableTrickPlay = false
+        ' Additional properties for error tolerance
+        videoContent.MinBandwidth = 0
+        videoContent.MaxBandwidth = 0
+        if urlParts.hasCredentials
+            videoContent.HttpHeaders = ["Authorization:Basic " + urlParts.basicAuth]
+        end if
+    end if
+
+    ' Play video
+    m.v2VideoPlayer.content = videoContent
+    m.v2VideoPlayer.control = "play"
+
+    if m.v2VideoStatus <> invalid
+        m.v2VideoStatus.text = "Loading..."
+        m.v2VideoStatus.visible = true
+    end if
+    
+    print "TVGuideScreen.brs - [playV2ProgramPreview] Preview started: " + streamUrl
+end sub
+
+sub playV2ProgramFullScreen(channelIndex as integer, programIndex as integer)
+    if m.channelsData = invalid then return
+    if channelIndex < 0 or channelIndex >= m.channelsData.Count() then return
+    
+    channel = m.channelsData[channelIndex]
+    if channel = invalid then return
+    
+    print "TVGuideScreen.brs - [playV2ProgramFullScreen] Opening full screen for channel " + channelIndex.ToStr()
+    
+    ' Stop the small preview video player first (Roku only supports one video instance)
+    if m.v2VideoPlayer <> invalid
+        m.v2VideoPlayer.control = "stop"
+        print "TVGuideScreen.brs - [playV2ProgramFullScreen] Stopped preview video player"
+    end if
+    
+    ' Get stream URL
+    streamUrl = getChannelStreamUrl(channel, programIndex)
+    
+    if streamUrl = "" or streamUrl = invalid
+        print "TVGuideScreen.brs - [playV2ProgramFullScreen] ERROR: No stream URL available"
+        return
+    end if
+    
+    ' Get channel and program details
+    channelTitle = "Live TV"
+    if channel.title <> invalid and channel.title <> ""
+        channelTitle = channel.title
+    else if channel.name <> invalid and channel.name <> ""
+        channelTitle = channel.name
+    end if
+    
+    programTitle = ""
+    programDescription = ""
+    thumbnailUrl = ""
+    
+    if channel.shows <> invalid and programIndex >= 0 and programIndex < channel.shows.Count()
+        program = channel.shows[programIndex]
+        if program <> invalid
+            if program.name <> invalid and program.name <> ""
+                programTitle = program.name
+            end if
+            if program.longdescription <> invalid and program.longdescription <> ""
+                programDescription = program.longdescription
+            else if program.description <> invalid and program.description <> ""
+                programDescription = program.description
+            end if
+        end if
+    end if
+    
+    ' Get channel logo for thumbnail
+    if channel.logo <> invalid and channel.logo <> ""
+        thumbnailUrl = channel.logo
+    else if channel.icon <> invalid and channel.icon <> ""
+        if Left(channel.icon, 4) = "http"
+            thumbnailUrl = channel.icon
+        else
+            thumbnailUrl = "https://giatv.dineo.uk" + channel.icon
+        end if
+    end if
+    
+    ' Create video data for full screen player
+    videoData = {
+        contentUrl: streamUrl,
+        title: programTitle + " - " + channelTitle,
+        description: programDescription,
+        thumbnail: thumbnailUrl,
+        isLive: true
+    }
+    
+    print "TVGuideScreen.brs - [playV2ProgramFullScreen] Requesting full screen video playback"
+    m.top.videoPlayRequested = videoData
+end sub
+
+function getChannelStreamUrl(channel as object, programIndex as integer) as string
+    streamUrl = ""
+    
+    ' Try to get stream URL from program first
+    if channel.shows <> invalid and programIndex >= 0 and programIndex < channel.shows.Count()
+        program = channel.shows[programIndex]
+        if program <> invalid and program.url <> invalid and program.url <> ""
+            streamUrl = program.url
+            return streamUrl
+        end if
+    end if
+    
+    ' Fall back to channel stream URL
+    if channel.stream_url <> invalid and channel.stream_url <> ""
+        streamUrl = channel.stream_url
+    else if channel.sources <> invalid
+        if channel.sources.primary <> invalid and channel.sources.primary <> ""
+            streamUrl = channel.sources.primary
+        else if channel.sources.hls <> invalid and channel.sources.hls <> ""
+            streamUrl = channel.sources.hls
+        end if
+    else if channel.http <> invalid and channel.http <> ""
+        streamUrl = channel.http
+    else if channel.url <> invalid and channel.url <> ""
+        streamUrl = channel.url
+    end if
+    
+    return streamUrl
+end function
+
+sub onV2VideoStateChanged()
+    if m.v2VideoPlayer = invalid or m.v2VideoStatus = invalid then return
+    
+    state = m.v2VideoPlayer.state
+    
+    if state = "playing"
+        m.v2VideoStatus.visible = false
+    else if state = "buffering"
+        m.v2VideoStatus.text = "Loading..."
+        m.v2VideoStatus.visible = true
+    else if state = "error"
+        m.v2VideoStatus.text = "Error loading stream"
+        m.v2VideoStatus.visible = true
+    else if state = "stopped"
+        m.v2VideoStatus.text = "Select a program to watch"
+        m.v2VideoStatus.visible = true
+    end if
+end sub
+
+sub updateV2ProgramTimeDisplay()
+    if m.v2ProgramRow = invalid or m.v2ProgramTimeLabel = invalid then return
+    
+    content = m.v2ProgramRow.content
+    if content = invalid or content.getChildCount() = 0 then return
+    
+    ' Get the first row (we only have one row)
+    rowNode = content.getChild(0)
+    if rowNode = invalid then return
+    
+    focusedIndex = m.v2CurrentProgramIndex
+    if focusedIndex < 0 or focusedIndex >= rowNode.getChildCount() then return
+    
+    programNode = rowNode.getChild(focusedIndex)
+    if programNode = invalid then return
+    
+    ' Get program times
+    startTime = programNode.startTime
+    endTime = programNode.endTime
+    
+    if startTime <> invalid and endTime <> invalid
+        ' Format times
+        startTimeFormatted = convertTo12HourFormat(startTime)
+        endTimeFormatted = convertTo12HourFormat(endTime)
+        
+        timeText = startTimeFormatted + " - " + endTimeFormatted
+        m.v2ProgramTimeLabel.text = timeText
+    else
+        m.v2ProgramTimeLabel.text = ""
+    end if
+end sub
+
+sub onKeyEventV2(key as string, press as boolean) as boolean
+    if not press then return false
+    
+    print "TVGuideScreen.brs - [onKeyEventV2] Key: " + key + ", Focus area: " + m.v2FocusArea
+    
+    if key = "right"
+        if m.v2FocusArea = "channels"
+            ' Move from channel list to program row
+            if m.v2ProgramRow <> invalid and m.v2ProgramRow.content <> invalid
+                print "TVGuideScreen.brs - [onKeyEventV2] Moving focus from channels to programs"
+                m.v2FocusArea = "programs"
+                m.v2ProgramRow.setFocus(true)
+                return true
+            end if
+        end if
+        return false
+    else if key = "left" or key = "back"
+        if m.v2FocusArea = "programs"
+            ' Move from program row back to channel list
+            print "TVGuideScreen.brs - [onKeyEventV2] Moving focus from programs to channels"
+            m.v2FocusArea = "channels"
+            if m.v2ChannelList <> invalid
+                m.v2ChannelList.setFocus(true)
+            end if
+            return true
+        else if m.v2FocusArea = "channels"
+            ' Return to navigation
+            print "TVGuideScreen.brs - [onKeyEventV2] Returning to navigation from channels"
+            returnFocusToNavigation()
+            return true
+        end if
+    else if key = "up" or key = "down"
+        ' Let the focused list handle up/down
+        return false
+    else if key = "OK"
+        ' Let the list components handle OK
+        return false
+    end if
+    
+    return false
 end sub

@@ -1888,6 +1888,120 @@ sub onDVRScreenFocusChanged()
 end sub
 
 ' Video Player Management Functions
+function parseUrlCredentials(url as string) as object
+    ' Extract credentials from URL like http://user:pass@host:port/path
+    ' Returns: { cleanUrl, username, password, hasCredentials, basicAuth }
+    
+    result = {
+        originalUrl: url
+        cleanUrl: url
+        username: ""
+        password: ""
+        hasCredentials: false
+        basicAuth: ""
+    }
+    
+    if url = invalid or url = "" then return result
+    
+    schemePos = Instr(1, url, "://")
+    atPos = Instr(1, url, "@")
+    
+    if schemePos > 0 and atPos > schemePos + 3
+        afterSchemePos = schemePos + 3
+        afterScheme = Mid(url, afterSchemePos)
+        slashPos = Instr(1, afterScheme, "/")
+        
+        ' Check if @ is in the authority section (before first /)
+        atIsInAuthority = true
+        if slashPos > 0
+            slashAbs = afterSchemePos + slashPos - 1
+            if slashAbs < atPos then atIsInAuthority = false
+        end if
+        
+        if atIsInAuthority
+            userInfo = Mid(url, afterSchemePos, atPos - afterSchemePos)
+            colonPos = Instr(1, userInfo, ":")
+            if colonPos > 0
+                result.username = Left(userInfo, colonPos - 1)
+                result.password = Mid(userInfo, colonPos + 1)
+                result.cleanUrl = Left(url, afterSchemePos - 1) + Mid(url, atPos + 1)
+                result.hasCredentials = true
+                
+                ' Create Base64 Basic Auth
+                bytes = CreateObject("roByteArray")
+                bytes.FromAsciiString(result.username + ":" + result.password)
+                result.basicAuth = bytes.ToBase64String()
+                
+                print "HomeScene.brs - [parseUrlCredentials] Extracted credentials from URL"
+                print "HomeScene.brs - [parseUrlCredentials] Clean URL: " + result.cleanUrl
+            end if
+        end if
+    end if
+    
+    return result
+end function
+
+function detectStreamFormat(url as string) as string
+    ' Detect stream format from URL extension
+    ' Supports: HLS (.m3u8), MPEG-TS (.ts), MP4 (.mp4), and others
+    
+    if url = invalid or url = "" then
+        print "HomeScene.brs - [detectStreamFormat] Invalid URL, defaulting to hls"
+        return "hls"
+    end if
+    
+    ' Convert to lowercase for case-insensitive comparison
+    urlLower = LCase(url)
+    
+    ' Check for .ts extension (MPEG-TS streams)
+    ' Note: Many IPTV providers use .ts URLs - use 'ts' format explicitly
+    if Instr(1, urlLower, ".ts") > 0
+        ' Check if this looks like an HLS segment (has m3u8 in path or chunklist/segment pattern)
+        if Instr(1, urlLower, "m3u8") > 0 or Instr(1, urlLower, "chunklist") > 0 or Instr(1, urlLower, "segment") > 0
+            print "HomeScene.brs - [detectStreamFormat] Detected HLS stream with .ts segments"
+            return "hls"
+        ' For all other .ts files (including IPTV), use explicit 'ts' format
+        else
+            print "HomeScene.brs - [detectStreamFormat] Detected MPEG-TS stream (.ts) - using 'ts' format"
+            return "ts"
+        end if
+    end if
+    
+    ' Check for .m3u8 (HLS)
+    if Instr(1, urlLower, ".m3u8") > 0
+        print "HomeScene.brs - [detectStreamFormat] Detected HLS stream (.m3u8)"
+        return "hls"
+    end if
+    
+    ' Check for .mp4
+    if Instr(1, urlLower, ".mp4") > 0
+        print "HomeScene.brs - [detectStreamFormat] Detected MP4 stream (.mp4)"
+        return "mp4"
+    end if
+    
+    ' Check for .mkv
+    if Instr(1, urlLower, ".mkv") > 0
+        print "HomeScene.brs - [detectStreamFormat] Detected MKV stream (.mkv)"
+        return "mkv"
+    end if
+    
+    ' Check for DASH manifest
+    if Instr(1, urlLower, ".mpd") > 0
+        print "HomeScene.brs - [detectStreamFormat] Detected DASH stream (.mpd)"
+        return "dash"
+    end if
+    
+    ' Check for ISM (Smooth Streaming)
+    if Instr(1, urlLower, ".ism") > 0 or Instr(1, urlLower, "/manifest") > 0
+        print "HomeScene.brs - [detectStreamFormat] Detected Smooth Streaming (.ism)"
+        return "ism"
+    end if
+    
+    ' Default to HLS if no match
+    print "HomeScene.brs - [detectStreamFormat] No specific format detected, defaulting to hls for URL: " + url
+    return "hls"
+end function
+
 sub showVideoPlayer(videoData as object)
     print "HomeScene.brs - [showVideoPlayer] Showing video player for: " + videoData.title
     
@@ -1904,6 +2018,20 @@ sub showVideoPlayer(videoData as object)
     if m3uScreen <> invalid and m3uScreen.visible = true
         m.returnToM3UScreen = true
         print "HomeScene.brs - [showVideoPlayer] Coming from M3UChannelScreen, will return there on back"
+    end if
+    
+    ' Check if we're coming from TV Guide screen
+    m.returnToTVGuide = false
+    if m.dynamicContentScreens <> invalid
+        for each key in m.dynamicContentScreens
+            screen = m.dynamicContentScreens[key].screen
+            if screen <> invalid and screen.visible = true and screen.id = "tvguide_screen"
+                m.returnToTVGuide = true
+                m.tvGuideScreenKey = key
+                print "HomeScene.brs - [showVideoPlayer] Coming from TV Guide, will return there on back"
+                exit for
+            end if
+        end for
     end if
     
     ' Store current screen and selection state for restoration
@@ -1927,12 +2055,69 @@ sub showVideoPlayer(videoData as object)
     ' Hide all other content
     hideAllScreensForVideo()
     
+    ' Parse URL for credentials (important for IPTV MPEG-TS streams)
+    urlParts = parseUrlCredentials(videoData.contentUrl)
+    finalUrl = videoData.contentUrl
+    if urlParts.hasCredentials
+        finalUrl = urlParts.cleanUrl
+        print "HomeScene.brs - [showVideoPlayer] Using clean URL with Basic Auth"
+    end if
+    
+    ' Detect stream format from URL
+    detectedFormat = detectStreamFormat(finalUrl)
+    
+    ' For MPEG-TS streams with credentials, attach roHttpAgent BEFORE creating content
+    videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
+    if videoPlayerNode <> invalid and detectedFormat = "ts" and urlParts.hasCredentials
+        agent = CreateObject("roHttpAgent")
+        authHeader = "Basic " + urlParts.basicAuth
+        ok = agent.AddHeader("Authorization", authHeader)
+        videoPlayerNode.SetHttpAgent(agent)
+        print "HomeScene.brs - [showVideoPlayer] Attached roHttpAgent with Basic Auth for MPEG-TS"
+        print "HomeScene.brs - [showVideoPlayer] AddHeader result: " + ok.ToStr()
+    end if
+    
     ' Create content node for the video player
     videoContent = CreateObject("roSGNode", "ContentNode")
-    videoContent.url = videoData.contentUrl
+    videoContent.url = finalUrl
     videoContent.title = videoData.title
-    videoContent.streamFormat = "hls"
     
+    ' Set stream format (use both lowercase and uppercase for compatibility)
+    if detectedFormat <> "" then
+        videoContent.streamformat = detectedFormat
+        videoContent.StreamFormat = detectedFormat
+        print "HomeScene.brs - [showVideoPlayer] Setting streamFormat: " + detectedFormat
+    else
+        print "HomeScene.brs - [showVideoPlayer] Using Roku auto-detection (no streamFormat set)"
+    end if
+    
+    ' Disable transcoding for live streams and .ts files
+    ' Setting live=true tells Roku to disable transcoding (use both variants)
+    if videoData.isLive = true or detectedFormat = "ts" or detectedFormat = "hls" or Instr(1, LCase(finalUrl), ".ts") > 0
+        videoContent.live = true
+        videoContent.Live = true
+        print "HomeScene.brs - [showVideoPlayer] Transcoding disabled (live=true)"
+    end if
+    
+    ' Important for MPEG-TS: Sticky redirects and ignore stream errors
+    if detectedFormat = "ts"
+        videoContent.StreamStickyHttpRedirects = [true]
+        ' Be lenient with malformed metadata in MPEG-TS streams
+        videoContent.IgnoreStreamErrors = true
+        ' Disable trick play to reduce parsing strictness
+        videoContent.EnableTrickPlay = false
+        ' Additional properties for error tolerance
+        videoContent.MinBandwidth = 0
+        videoContent.MaxBandwidth = 0
+        print "HomeScene.brs - [showVideoPlayer] Set MPEG-TS specific properties (lenient mode)"
+    end if
+    
+    ' For MPEG-TS with auth, also set HttpHeaders as fallback
+    if detectedFormat = "ts" and urlParts.hasCredentials
+        videoContent.HttpHeaders = ["Authorization:Basic " + urlParts.basicAuth]
+        print "HomeScene.brs - [showVideoPlayer] Set ContentNode HttpHeaders for MPEG-TS"
+    end if
+
     if videoData.description <> invalid
         videoContent.description = videoData.description
     end if
@@ -1984,6 +2169,9 @@ sub showVideoPlayer(videoData as object)
     else if m.returnToSeasonScreen = true
         m.videoPlayerScreen.navigatedFrom = "Seasons"
         print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to Seasons for error handling"
+    else if m.returnToTVGuide = true
+        m.videoPlayerScreen.navigatedFrom = "TVGuide"
+        print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to TVGuide for error handling"
     else
         m.videoPlayerScreen.navigatedFrom = ""
         print "HomeScene.brs - [showVideoPlayer] Set navigatedFrom to empty (managed by home scene)"
@@ -2079,6 +2267,29 @@ sub hideVideoPlayer()
         end if
         
         m.returnToM3UScreen = false
+    else if m.returnToTVGuide = true
+        print "HomeScene.brs - [hideVideoPlayer] Returning to TV Guide screen"
+        
+        ' Restore navigation
+        if m.dynamicNavBar <> invalid
+            m.dynamicNavBar.visible = true
+        end if
+        
+        ' Show TV Guide screen and restore focus
+        if m.tvGuideScreenKey <> invalid and m.dynamicContentScreens <> invalid
+            screenInfo = m.dynamicContentScreens[m.tvGuideScreenKey]
+            if screenInfo <> invalid and screenInfo.screen <> invalid
+                screenInfo.screen.visible = true
+                
+                ' Trigger focus restoration to program row
+                tvGuideScreen = screenInfo.screen
+                tvGuideScreen.explicitContentFocusRequested = tvGuideScreen.explicitContentFocusRequested + 1
+                print "HomeScene.brs - [hideVideoPlayer] TV Guide screen restored, focus restoration triggered"
+            end if
+        end if
+        
+        m.returnToTVGuide = false
+        m.tvGuideScreenKey = invalid
     else
         ' Restore navigation and content normally
         restoreNavigationAndContent()
@@ -2335,21 +2546,10 @@ sub onRestoreSelectionTimer()
             if screen <> invalid
                 ' Check if this is a TV Guide screen
                 if screenType = "tvguide"
-                    timeGrid = screen.findNode("timeGrid")
-                    if timeGrid <> invalid
-                        ' Restore TimeGrid focus
-                        if m.previousItemSelection.channelFocused <> invalid and m.previousItemSelection.programFocused <> invalid
-                            ' Use jumpToItem to restore both channel and program focus
-                            timeGrid.jumpToItem = [m.previousItemSelection.channelFocused, m.previousItemSelection.programFocused]
-                            print "HomeScene.brs - [onRestoreSelectionTimer] Restored TimeGrid focus to channel: " + m.previousItemSelection.channelFocused.ToStr() + ", program: " + m.previousItemSelection.programFocused.ToStr()
-                        end if
-                        
-                        ' Set focus on the TimeGrid
-                        timeGrid.setFocus(true)
-                        print "HomeScene.brs - [onRestoreSelectionTimer] Focus restored to TV Guide TimeGrid"
-                    else
-                        print "HomeScene.brs - [onRestoreSelectionTimer] ERROR: TimeGrid not found in TV Guide screen"
-                    end if
+                    ' TV Guide uses explicit focus restoration via explicitContentFocusRequested
+                    ' Don't try to restore selection here, let the screen handle it
+                    print "HomeScene.brs - [onRestoreSelectionTimer] TV Guide screen - using explicit focus restoration"
+                    screen.explicitContentFocusRequested = screen.explicitContentFocusRequested + 1
                 else if screenType = "userchannelsgrid"
                     ' Handle User Channels grid
                     print "HomeScene.brs - [onRestoreSelectionTimer] Restoring User Channels Grid selection"
@@ -2593,8 +2793,38 @@ sub onVideoErrorChanged()
     
     if m.videoPlayerScreen <> invalid
         videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
-        if videoPlayerNode <> invalid and videoPlayerNode.errorMsg <> ""
-            print "HomeScene.brs - [onVideoErrorChanged] ERROR: " + videoPlayerNode.errorMsg
+        if videoPlayerNode <> invalid
+            ' Detailed error logging for diagnostics
+            if videoPlayerNode.errorMsg <> "" and videoPlayerNode.errorMsg <> invalid
+                print "HomeScene.brs - [onVideoErrorChanged] ============================================"
+                print "HomeScene.brs - [onVideoErrorChanged] DETAILED ERROR DIAGNOSTICS:"
+                print "HomeScene.brs - [onVideoErrorChanged] Error Message: " + videoPlayerNode.errorMsg
+                
+                if videoPlayerNode.errorCode <> invalid
+                    print "HomeScene.brs - [onVideoErrorChanged] Error Code: " + videoPlayerNode.errorCode.ToStr()
+                end if
+                
+                if videoPlayerNode.errorStr <> invalid and videoPlayerNode.errorStr <> ""
+                    print "HomeScene.brs - [onVideoErrorChanged] Error String: " + videoPlayerNode.errorStr
+                end if
+                
+                if videoPlayerNode.streamingSegment <> invalid
+                    print "HomeScene.brs - [onVideoErrorChanged] Streaming Segment: " + FormatJson(videoPlayerNode.streamingSegment)
+                end if
+                
+                ' Check for specific MPEG-TS / codec issues
+                errorLower = LCase(videoPlayerNode.errorMsg)
+                if Instr(1, errorLower, "malformed") > 0 or Instr(1, errorLower, "format") > 0
+                    print "HomeScene.brs - [onVideoErrorChanged] *** LIKELY CAUSES FOR MALFORMED DATA ***"
+                    print "HomeScene.brs - [onVideoErrorChanged] 1. Malformed H.264 metadata (SPS/PPS issues)"
+                    print "HomeScene.brs - [onVideoErrorChanged] 2. Unsupported codec (MPEG-2 - Roku only supports H.264, H.265, VP9)"
+                    print "HomeScene.brs - [onVideoErrorChanged] 3. Stream corruption or incomplete data"
+                    print "HomeScene.brs - [onVideoErrorChanged] Recommendation: Check with ffprobe <URL> or contact IPTV provider"
+                    print "HomeScene.brs - [onVideoErrorChanged] Current settings: IgnoreStreamErrors=true, EnableTrickPlay=false (lenient mode)"
+                end if
+                
+                print "HomeScene.brs - [onVideoErrorChanged] ============================================"
+            end if
         end if
     end if
 end sub

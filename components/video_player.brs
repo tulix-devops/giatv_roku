@@ -1,3 +1,19 @@
+function detectStreamFormat(url as string) as string
+    ' Detect stream format from URL extension
+    if url = invalid or url = "" then return "hls"
+    
+    urlLower = LCase(url)
+    
+    if Instr(1, urlLower, ".ts") > 0 then return "ts"
+    if Instr(1, urlLower, ".m3u8") > 0 then return "hls"
+    if Instr(1, urlLower, ".mp4") > 0 then return "mp4"
+    if Instr(1, urlLower, ".mkv") > 0 then return "mkv"
+    if Instr(1, urlLower, ".mpd") > 0 then return "dash"
+    if Instr(1, urlLower, ".ism") > 0 or Instr(1, urlLower, "/manifest") > 0 then return "ism"
+    
+    return "hls"
+end function
+
 sub init()
     ' m.top.observeField("contentURL", "onContentURLChanged")
     ' m.videoPlayer = m.top.findNode("videoPlayer")
@@ -9,8 +25,21 @@ sub init()
     ' m.videoPlayer.control = "play" ' Start playing immediately
 
     videoContent = createObject("roSGNode", "ContentNode")
-    videoContent.url = "https://bozztv.com/dvrfl05/gin-armeniaeu1/tracks-v1a1/mono.m3u8"
-    videoContent.streamFormat = "hls" ' Specify the stream format, if known
+    testUrl = "https://bozztv.com/dvrfl05/gin-armeniaeu1/tracks-v1a1/mono.m3u8"
+    videoContent.url = testUrl
+    detectedFormat = detectStreamFormat(testUrl)
+    videoContent.streamFormat = detectedFormat
+    
+    ' MPEG-TS specific properties for error tolerance
+    if detectedFormat = "ts"
+        videoContent.StreamStickyHttpRedirects = [true]
+        videoContent.IgnoreStreamErrors = true
+        videoContent.EnableTrickPlay = false
+        videoContent.MinBandwidth = 0
+        videoContent.MaxBandwidth = 0
+        videoContent.live = true
+    end if
+    
     m.videoPlayer = m.top.findNode("videoPlayer")
     m.videoPlayer.content = videoContent
     ' m.videoPlayer.control = "play"
@@ -44,6 +73,19 @@ sub onContentURLChanged()
     if url <> invalid and url <> ""
         content = createObject("roSGNode", "ContentNode")
         content.url = url
+        detectedFormat = detectStreamFormat(url)
+        content.streamFormat = detectedFormat
+        
+        ' MPEG-TS specific properties for error tolerance
+        if detectedFormat = "ts"
+            content.StreamStickyHttpRedirects = [true]
+            content.IgnoreStreamErrors = true
+            content.EnableTrickPlay = false
+            content.MinBandwidth = 0
+            content.MaxBandwidth = 0
+            content.live = true
+        end if
+        
         m.videoPlayer.content = content
     end if
 end sub

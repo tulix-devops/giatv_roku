@@ -241,6 +241,174 @@
             nowBarOffset="0"
             minimumNowBarOffset="0" />
 
+        <!-- ############################################################################## -->
+        <!-- ######################### TV GUIDE V2 COMPONENTS ############################# -->
+        <!-- ############################################################################## -->
+
+        <!-- V2: CHANNEL LIST (Left Side) - 13-14 channels visible -->
+        <Group id="v2ChannelListGroup" translation="[25, 150]" visible="true">
+            <!-- Channel list container background -->
+            <Rectangle 
+                id="v2ChannelListBg"
+                width="320"
+                height="910"
+                color="#1F3B5C"
+                opacity="0.3" />
+            
+            <!-- Channel list (MarkupGrid with single column) -->
+            <MarkupGrid
+                id="v2ChannelList"
+                translation="[10, 10]"
+                itemSize="[300, 70]"
+                itemSpacing="[0, 5]"
+                numColumns="1"
+                numRows="12"
+                drawFocusFeedback="true"
+                drawFocusFeedbackOnTop="false"
+                focusBitmapUri="pkg:/images/png/button_short.png"
+                vertFocusAnimationStyle="floatingFocus"
+                itemComponentName="ChannelLogoItem"
+                visible="true" />
+        </Group>
+
+        <!-- V2: VIDEO PREVIEW (Top Right) -->
+        <Group id="v2VideoPreviewGroup" translation="[370, 150]" visible="true">
+            <!-- Video preview background -->
+            <Rectangle
+                id="v2VideoPreviewBg"
+                width="1500"
+                height="540"
+                color="#000000"
+                opacity="1.0" />
+            
+            <!-- Video player -->
+            <Video
+                id="v2VideoPlayer"
+                translation="[0, 0]"
+                width="1500"
+                height="540"
+                visible="true"
+                loop="false"
+                control="stop"
+                enableUI="false" />
+            
+            <!-- Video status overlay -->
+            <Label
+                id="v2VideoStatus"
+                text="Select a program to watch"
+                translation="[0, 0]"
+                width="1500"
+                height="540"
+                color="#FFFFFF"
+                horizAlign="center"
+                vertAlign="center"
+                visible="true">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="28" />
+            </Label>
+        </Group>
+
+        <!-- V2: PROGRAM ROW (Bottom Right) -->
+        <Group id="v2ProgramRowGroup" translation="[370, 720]" visible="true">
+            <!-- Program row background -->
+            <Rectangle
+                id="v2ProgramRowBg"
+                width="1500"
+                height="330"
+                color="#1F3B5C"
+                opacity="0.3" />
+            
+            <!-- Program time label -->
+            <Label
+                id="v2ProgramTimeLabel"
+                text=""
+                translation="[20, 15]"
+                width="1485"
+                height="30"
+                color="#4FC3F7"
+                horizAlign="left"
+                vertAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24" />
+            </Label>
+            
+            <!-- Program row (horizontal RowList) -->
+            <RowList
+                id="v2ProgramRow"
+                translation="[10, 50]"
+                itemComponentName="ProgramCard"
+                itemSize="[1505, 240]"
+                rowItemSize="[[360, 240]]"
+                itemSpacing="[0, 0]"
+                rowItemSpacing="[[15, 0]]"
+                showRowLabel="[false]"
+                numRows="1"
+                drawFocusFeedback="true"
+                drawFocusFeedbackOnTop="false"
+                focusBitmapUri="pkg:/images/png/button_tall.png"
+                rowFocusAnimationStyle="fixedFocusWrap"
+                visible="true" />
+            
+            <!-- Navigation hint -->
+            <Label
+                id="v2NavigationHint"
+                text="OK to watch • ↑↓ channels • ← → programs • BACK to channels/exit"
+                translation="[20, 295]"
+                width="1485"
+                height="25"
+                color="#4FC3F7"
+                horizAlign="center"
+                vertAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="18" />
+            </Label>
+        </Group>
+
+        <!-- V2: LOADING UI -->
+        <Group id="v2LoadingGroup" translation="[0, 0]" visible="false">
+            <!-- Semi-transparent overlay -->
+            <Rectangle
+                width="1920"
+                height="1080"
+                color="#000000"
+                opacity="0.7" />
+            
+            <!-- Loading for channel list -->
+            <Group translation="[25, 150]">
+                <Rectangle
+                    width="320"
+                    height="910"
+                    color="#1F3B5C"
+                    opacity="0.5" />
+                <Label
+                    text="Loading Channels..."
+                    translation="[160, 455]"
+                    width="320"
+                    height="40"
+                    color="#4FC3F7"
+                    horizAlign="center"
+                    vertAlign="center">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24" />
+                </Label>
+            </Group>
+            
+            <!-- Loading for program row -->
+            <Group translation="[370, 720]">
+                <Rectangle
+                    width="1525"
+                    height="340"
+                    color="#1F3B5C"
+                    opacity="0.5" />
+                <Label
+                    text="Loading Programs..."
+                    translation="[762, 170]"
+                    width="400"
+                    height="40"
+                    color="#4FC3F7"
+                    horizAlign="center"
+                    vertAlign="center">
+                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24" />
+                </Label>
+            </Group>
+        </Group>
+
         <!-- ANIMATIONS -->
         <!-- Animation to move TimeGrid down and shrink it (opening detail view) -->
         <Animation id="timeGridMoveDownAnimation" duration="0.4" easeFunction="outCubic">

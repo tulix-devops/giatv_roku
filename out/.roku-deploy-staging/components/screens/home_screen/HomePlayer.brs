@@ -62,6 +62,22 @@ sub onFullscreenButtonSelected()
     end if
 end sub
 
+function detectStreamFormat(url as string) as string
+    ' Detect stream format from URL extension
+    if url = invalid or url = "" then return "hls"
+    
+    urlLower = LCase(url)
+    
+    if Instr(1, urlLower, ".ts") > 0 then return "ts"
+    if Instr(1, urlLower, ".m3u8") > 0 then return "hls"
+    if Instr(1, urlLower, ".mp4") > 0 then return "mp4"
+    if Instr(1, urlLower, ".mkv") > 0 then return "mkv"
+    if Instr(1, urlLower, ".mpd") > 0 then return "dash"
+    if Instr(1, urlLower, ".ism") > 0 or Instr(1, urlLower, "/manifest") > 0 then return "ism"
+    
+    return "hls"
+end function
+
 sub onContentURLChanged()
     url = m.top.contentURL
     if url = "" then
@@ -71,7 +87,19 @@ sub onContentURLChanged()
     if url <> invalid and url <> ""
         content = createObject("roSGNode", "ContentNode")
         content.url = url
-        content.streamFormat = "hls"
+        detectedFormat = detectStreamFormat(url)
+        content.streamFormat = detectedFormat
+        
+        ' MPEG-TS specific properties for error tolerance
+        if detectedFormat = "ts"
+            content.StreamStickyHttpRedirects = [true]
+            content.IgnoreStreamErrors = true
+            content.EnableTrickPlay = false
+            content.MinBandwidth = 0
+            content.MaxBandwidth = 0
+            content.live = true
+        end if
+        
         m.videoPlayer.content = content
         m.videoPlayer.loop = true
         m.videoPlayer.control = "play"

@@ -113,11 +113,21 @@ sub On_dialogErrStream_buttonSelected()
         end if
     else if m.top.navigatedFrom = "Seasons"
         print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Returning to Season screen"
-        
+
         seasonScreen = m.global.findNode("SeasonScreen")
         if seasonScreen <> invalid
             seasonScreen.visible = true
             seasonScreen.setFocus(true)
+        end if
+    else if m.top.navigatedFrom = "TVGuide"
+        print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Returning to TV Guide screen"
+
+        ' Get the main scene to handle return via hideVideoPlayer
+        mainScene = m.top.getScene()
+        if mainScene <> invalid
+            ' Trigger hideVideoPlayer through the scene which will handle TV Guide return
+            mainScene.callFunc("hideVideoPlayer")
+            print "VideoDVRScreen.brs - [On_dialogErrStream_buttonSelected()] Called hideVideoPlayer on scene"
         end if
     else if m.top.navigatedFrom = "VOD"
         m.global.findNode("vod_screen").setFocus(true)
@@ -325,6 +335,10 @@ function onKeyEvent(key as string, isPressed as boolean) as boolean
                 print "VideoDVRScreen.brs - [onKeyEvent] ERROR: m3uChannelScreen not found"
             end if
             return true
+        else if m.top.navigatedFrom = "TVGuide" then
+            print "VideoDVRScreen.brs - [onKeyEvent] Returning to TV Guide"
+            m.top.backButtonPressed = true
+            return true
         end if
 
     end if
@@ -498,6 +512,12 @@ sub onVideoPlayerStateChange()
                 m3uScreen.visible = true
             else
                 print "VideoDVRScreen.brs - [onVideoPlayerStateChange] ERROR: m3uChannelScreen not found"
+            end if
+        else if m.top.navigatedFrom = "TVGuide" then
+            print "VideoDVRScreen.brs - [onVideoPlayerStateChange] Finished - Returning to TV Guide"
+            mainScene = m.top.getScene()
+            if mainScene <> invalid
+                mainScene.callFunc("hideVideoPlayer")
             end if
 
         end if
