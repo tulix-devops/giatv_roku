@@ -4,6 +4,17 @@ sub init()
 end sub
 
 sub GetNavigationData()
+    ' OPTIMIZATION: Check cache first (valid for 1 hour)
+    cachedNav = readCache("navigationData", 3600) ' 1 hour = 3600 seconds
+    if cachedNav <> invalid
+        print "NavigationApi.brs - [GetNavigationData] *** USING CACHED NAVIGATION DATA ***"
+        m.top.responseData = cachedNav
+        ' Still fetch fresh data in background to update cache
+        print "NavigationApi.brs - [GetNavigationData] Fetching fresh data in background to update cache"
+    else
+        print "NavigationApi.brs - [GetNavigationData] No valid cache found, fetching from API"
+    end if
+    
     ' Create HTTP request for navigation data
     url = "https://giatv.dineo.uk/api/content-type/list"
     print "NavigationApi.brs - [GetNavigationData] Requesting: " + url
@@ -73,6 +84,9 @@ sub GetNavigationData()
             if hasValidData
                 print "NavigationApi.brs - [GetNavigationData] Success: " + responseDataField.Count().ToStr() + " items"
                 m.top.responseData = response
+                ' OPTIMIZATION: Cache the navigation data
+                writeCache("navigationData", response)
+                print "NavigationApi.brs - [GetNavigationData] *** CACHED NAVIGATION DATA ***"
             else
                 print "NavigationApi.brs - [GetNavigationData] WARNING: Unexpected response structure, but passing through"
                 ' Pass through the response anyway - let the navigation bar handle it
@@ -167,3 +181,73 @@ function RegRead(key, section = invalid)
     if sec.Exists(key) then return sec.Read(key)
     return invalid
 end function
+
+' ==================== CACHE UTILITIES ====================
+
+function readCache(cacheKey as string, maxAge as integer) as dynamic
+    ' Read cached data if it exists and is not expired
+    ' maxAge is in seconds (e.g., 3600 = 1 hour)
+    
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    ' Check if cache exists
+    if not sec.Exists(cacheKey) then return invalid
+    if not sec.Exists(cacheKey + "_timestamp") then return invalid
+    
+    ' Read cache data and timestamp
+    cacheData = sec.Read(cacheKey)
+    timestampStr = sec.Read(cacheKey + "_timestamp")
+    
+    if cacheData = invalid or timestampStr = invalid then return invalid
+    
+    ' Check if cache is still valid
+    currentTime = CreateObject("roDateTime").AsSeconds()
+    cacheTime = timestampStr.ToInt()
+    age = currentTime - cacheTime
+    
+    if age > maxAge
+        print "Cache expired for '" + cacheKey + "' (age: " + age.ToStr() + "s, max: " + maxAge.ToStr() + "s)"
+        return invalid
+    end if
+    
+    print "Cache hit for '" + cacheKey + "' (age: " + age.ToStr() + "s)"
+    return cacheData
+end function
+
+sub writeCache(cacheKey as string, data as string)
+    ' Write data to cache with current timestamp
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    ' Store data
+    sec.Write(cacheKey, data)
+    
+    ' Store timestamp
+    currentTime = CreateObject("roDateTime").AsSeconds()
+    sec.Write(cacheKey + "_timestamp", currentTime.ToStr())
+    
+    ' Flush to disk
+    sec.Flush()
+    
+    print "Cached '" + cacheKey + "' at " + currentTime.ToStr()
+end sub
+
+sub clearCache(cacheKey = invalid as dynamic)
+    ' Clear specific cache key or all cache if cacheKey is invalid
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    if cacheKey <> invalid
+        ' Clear specific cache
+        sec.Delete(cacheKey)
+        sec.Delete(cacheKey + "_timestamp")
+        print "Cleared cache for: " + cacheKey
+    else
+        ' Clear all cache
+        sec.Delete()
+        print "Cleared all cache"
+    end if
+    
+    sec.Flush()
+end sub

@@ -88,7 +88,7 @@
                 font="font:UrbanistMedium"
                 horizAlign="center"
                 translation="[-100, 0]"
-                width="200">
+                width="300">
                 <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
             </Label>
         </Group>
@@ -178,31 +178,134 @@
             <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
         </Label>
 
-        <!-- Grid View for Channels (moved down for more spacing) -->
-        <MarkupGrid
-            id="channelGrid"
-            translation="[25, 235]"
-            visible="false"
-            itemComponentName="M3UChannelItem"
-            vertFocusAnimationStyle="fixedFocus"
-            itemSize="[360, 250]"
-            numColumns="5"
-            numRows="3"
-            itemSpacing="[15, 15]"
-            drawFocusFeedback="true"/>
+        <!-- Animations -->
+        <Animation id="gridFadeOut" duration="0.15" repeat="false" easeFunction="linear">
+            <FloatFieldInterpolator key="[1.0, 0.0]" fieldToInterp="channelGridContainer.opacity"/>
+        </Animation>
+        <Animation id="gridFadeIn" duration="0.2" repeat="false" easeFunction="linear">
+            <FloatFieldInterpolator key="[0.0, 1.0]" fieldToInterp="channelGridContainer.opacity"/>
+        </Animation>
+        
+        <!-- Main Content Container (Left sidebar + Right grid) -->
+        <Group id="contentContainer" translation="[25, 240]">
+            
+            <!-- Left Side: Category List -->
+            <Group id="categoryListContainer" translation="[0, 10]">
+                <LabelList
+                    id="categoryLabelList"
+                    translation="[0, 0]"
+                    itemSize="[280, 35]"
+                    numRows="20"
+                    focusRow="0"
+                    drawFocusFeedback="true"
+                    focusBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
+                    focusFootprintBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
+                    color="0xFFFFFFFF"
+                    focusedColor="0x3A4A6AFF"
+                    font="font:SmallSystemFont"
+                    focusedFont="font:SmallSystemFont"
+                    vertFocusAnimationStyle="fixedFocus"
+                    itemSpacing="[0, 35]"
+                    sectionDividerLeftOffset="20"
+                    visible="false"
+                    wrap="false"/>
+            </Group>
+            
+            <!-- Right Side: Channel Grid (4 columns) -->
+            <Group id="channelGridContainer" translation="[330, 0]">
+                <!-- Grid View for Channels -->
+                <MarkupGrid
+                    id="channelGrid"
+                    translation="[0, 0]"
+                    visible="false"
+                    itemComponentName="M3UChannelItem"
+                    vertFocusAnimationStyle="floatingFocus"
+                    itemSize="[360, 250]"
+                    numColumns="4"
+                    numRows="3"
+                    itemSpacing="[20, 20]"
+                    drawFocusFeedback="true"/>
 
-        <!-- Search Results Grid (same position, shows filtered results) -->
-        <MarkupGrid
-            id="searchResultsGrid"
-            translation="[25, 235]"
-            visible="false"
-            itemComponentName="M3UChannelItem"
-            itemSize="[360, 250]"
-            numColumns="5"
-            numRows="3"
-            vertFocusAnimationStyle="fixedFocus"
-            itemSpacing="[15, 15]"
-            drawFocusFeedback="true"/>
+                <!-- Search Results Grid (same position, shows filtered results) -->
+                <MarkupGrid
+                    id="searchResultsGrid"
+                    translation="[0, 0]"
+                    visible="false"
+                    itemComponentName="M3UChannelItem"
+                    itemSize="[360, 250]"
+                    numColumns="4"
+                    numRows="3"
+                    vertFocusAnimationStyle="floatingFocus"
+                    itemSpacing="[20, 20]"
+                    drawFocusFeedback="true"/>
+                
+                <!-- Preview Player Overlay (positioned over focused item) -->
+                <Group id="previewPlayerContainer" translation="[0, 0]" visible="false">
+                    <!-- Background for preview -->
+                    <Rectangle
+                        id="previewBackground"
+                        width="360"
+                        height="250"
+                        color="#000000"
+                        opacity="1.0"/>
+                    
+                    <!-- Preview Video Player (same size as grid item) -->
+                    <Video
+                        id="previewPlayer"
+                        translation="[0, 0]"
+                        width="360"
+                        height="250"
+                        visible="true"
+                        loop="false"
+                        enableUI="false"/>
+                    
+                    <!-- Status Messages Container (centered, full width) -->
+                    <Group id="previewStatusGroup" translation="[0, 0]" visible="false">
+                        <!-- Background for status -->
+                        <Rectangle
+                            width="360"
+                            height="250"
+                            color="#000000"
+                            opacity="0.85"
+                            translation="[0, 0]"/>
+                        
+                        <!-- Status Message (Loading / Error) -->
+                        <Label
+                            id="previewStatusLabel"
+                            text="Loading Stream..."
+                            color="#ffffff"
+                            font="font:MediumBoldSystemFont"
+                            horizAlign="center"
+                            vertAlign="center"
+                            translation="[0, 100]"
+                            width="340"
+                            height="50"
+                            wrap="true"/>
+                    </Group>
+                    
+                    <!-- LIVE indicator badge (bigger and more visible) -->
+                    <Rectangle
+                        id="liveIndicatorBg"
+                        translation="[8, 8]"
+                        width="80"
+                        height="35"
+                        color="#FF0000"
+                        opacity="1.0"/>
+                    <Label
+                        id="liveIndicatorText"
+                        text="● LIVE"
+                        color="#ffffff"
+                        font="font:MediumBoldSystemFont"
+                        horizAlign="center"
+                        vertAlign="center"
+                        translation="[8, 8]"
+                        width="80"
+                        height="35">
+                        <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20"/>
+                    </Label>
+                </Group>
+            </Group>
+        </Group>
         
         
 

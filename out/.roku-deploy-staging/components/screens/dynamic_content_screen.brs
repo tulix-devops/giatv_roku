@@ -1319,8 +1319,12 @@ sub onItemSelected()
                         if urlLower.Right(4) = ".m3u" and urlLower.Right(5) <> ".m3u8"
                             isM3UPlaylist = true
                             print "DynamicContentScreen.brs - [onItemSelected] M3U playlist detected by .m3u extension"
+                        ' Method 3: Check for IPTV provider M3U playlist patterns (get.php with type=m3u/m3u_plus)
+                        else if (Instr(1, urlLower, "type=m3u") > 0 or (Instr(1, urlLower, "get.php") > 0 and Instr(1, urlLower, "output=") > 0)) then
+                            isM3UPlaylist = true
+                            print "DynamicContentScreen.brs - [onItemSelected] M3U playlist detected by IPTV provider pattern (get.php, type=m3u, output=)"
                         else
-                            print "DynamicContentScreen.brs - [onItemSelected] URL contains .m3u but is likely HLS stream (.m3u8), not M3U playlist"
+                            print "DynamicContentScreen.brs - [onItemSelected] URL is not an M3U playlist - treating as direct video stream"
                         end if
                     end if
                     
@@ -1644,14 +1648,28 @@ sub navigateToM3UScreen(selectedItem as object)
     m3uUrl = ""
     if selectedItem.m3uUrl <> invalid and selectedItem.m3uUrl <> ""
         m3uUrl = selectedItem.m3uUrl
+        print "DynamicContentScreen.brs - [navigateToM3UScreen] Found M3U URL in 'm3uUrl' field"
     else if selectedItem.url <> invalid and selectedItem.url <> ""
-        ' Check if the URL ends with .m3u (but NOT .m3u8 which is HLS video)
         urlLower = LCase(selectedItem.url)
-        if urlLower.Right(4) = ".m3u" and urlLower.Right(5) <> ".m3u8"
+        
+        ' Check if URL is an M3U playlist:
+        ' 1. Ends with .m3u (but NOT .m3u8 which is HLS video)
+        ' 2. IPTV provider pattern (get.php with type=m3u or output= parameters)
+        isM3UUrl = false
+        
+        if urlLower.Right(4) = ".m3u" and urlLower.Right(5) <> ".m3u8" then
+            isM3UUrl = true
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] M3U playlist detected by .m3u extension"
+        else if (Instr(1, urlLower, "type=m3u") > 0 or (Instr(1, urlLower, "get.php") > 0 and Instr(1, urlLower, "output=") > 0)) then
+            isM3UUrl = true
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] M3U playlist detected by IPTV provider pattern"
+        end if
+        
+        if isM3UUrl
             m3uUrl = selectedItem.url
             print "DynamicContentScreen.brs - [navigateToM3UScreen] Found M3U playlist URL in 'url' field"
         else
-            print "DynamicContentScreen.brs - [navigateToM3UScreen] URL is not an M3U playlist (likely .m3u8 HLS stream)"
+            print "DynamicContentScreen.brs - [navigateToM3UScreen] URL is not an M3U playlist (likely .m3u8 HLS stream or direct video)"
         end if
     end if
 

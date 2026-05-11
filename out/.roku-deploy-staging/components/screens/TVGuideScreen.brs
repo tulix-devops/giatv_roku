@@ -2397,6 +2397,34 @@ function detectStreamFormat(url as string) as string
     ' Convert to lowercase for case-insensitive comparison
     urlLower = LCase(url)
     
+    ' Check for IPTV-style URLs with numeric path segments (e.g., /stream/channelid/123456)
+    ' These should be treated as MPEG-TS even without .ts extension
+    lastSlashPos = 0
+    for i = Len(urlLower) to 1 step -1
+        if Mid(urlLower, i, 1) = "/"
+            lastSlashPos = i
+            exit for
+        end if
+    end for
+    
+    if lastSlashPos > 0
+        lastSegment = Mid(url, lastSlashPos + 1)
+        ' Check if last segment is numeric (IPTV channel ID pattern)
+        isNumeric = true
+        for i = 1 to Len(lastSegment)
+            char = Mid(lastSegment, i, 1)
+            if char < "0" or char > "9"
+                isNumeric = false
+                exit for
+            end if
+        end for
+        
+        if isNumeric and Len(lastSegment) > 0
+            print "TVGuideScreen.brs - [detectStreamFormat] Detected IPTV numeric channel URL - using 'ts' format"
+            return "ts"
+        end if
+    end if
+    
     ' Check for .ts extension (MPEG-TS streams)
     ' Note: Many IPTV providers use .ts URLs - use 'ts' format explicitly
     if Instr(1, urlLower, ".ts") > 0
@@ -2515,14 +2543,13 @@ sub playV2ProgramPreview(channelIndex as integer, programIndex as integer)
         videoContent.StreamStickyHttpRedirects = [true]
         ' Be lenient with malformed metadata in MPEG-TS streams
         videoContent.IgnoreStreamErrors = true
-        ' Disable trick play to reduce parsing strictness
-        videoContent.EnableTrickPlay = false
         ' Additional properties for error tolerance
         videoContent.MinBandwidth = 0
         videoContent.MaxBandwidth = 0
         if urlParts.hasCredentials
             videoContent.HttpHeaders = ["Authorization:Basic " + urlParts.basicAuth]
         end if
+        print "TVGuideScreen.brs - [playV2ProgramPreview] MPEG-TS config: IgnoreStreamErrors=true, StreamStickyHttpRedirects=[true]"
     end if
 
     ' Play video

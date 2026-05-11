@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="CategoryItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChanged"/>
+        <field id="focusPercent" type="float" onChange="onFocusPercentChanged" />
+    </interface>
+    
+    <children>
+        <!-- Background Rectangle -->
+        <Rectangle
+            id="background"
+            width="180"
+            height="40"
+            color="#1e293b"
+            opacity="0.8"/>
+        
+        <!-- Category Label -->
+        <Label
+            id="categoryLabel"
+            text=""
+            color="#ffffff"
+            font="font:UrbanistBold"
+            horizAlign="center"
+            vertAlign="center"
+            translation="[0, 0]"
+            width="180"
+            height="40">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="22"/>
+        </Label>
+    </children>
+    
+    <script type="text/brightscript">
+        <![CDATA[
+        sub init()
+            print "CategoryItem.brs - [init] CategoryItem initialized"
+            m.background = m.top.findNode("background")
+            m.categoryLabel = m.top.findNode("categoryLabel")
+            
+            if m.background = invalid then print "CategoryItem.brs - [init] ERROR: background is invalid"
+            if m.categoryLabel = invalid then print "CategoryItem.brs - [init] ERROR: categoryLabel is invalid"
+        end sub
+        
+        sub onContentChanged()
+            content = m.top.itemContent
+            print "CategoryItem.brs - [onContentChanged] Content changed, content type: " + Type(content)
+            
+            if content <> invalid
+                if content.title <> invalid
+                    m.categoryLabel.text = content.title
+                    print "CategoryItem.brs - [onContentChanged] Set label text to: " + content.title
+                else
+                    print "CategoryItem.brs - [onContentChanged] ERROR: content.title is invalid"
+                end if
+            else
+                print "CategoryItem.brs - [onContentChanged] ERROR: content is invalid"
+            end if
+        end sub
+        
+        sub onFocusPercentChanged()
+            focusPercent = m.top.focusPercent
+            
+            if focusPercent >= 1.0
+                ' Fully focused
+                m.background.color = "#6366f1"
+                m.background.opacity = 1.0
+                m.categoryLabel.color = "#ffffff"
+            else
+                ' Not focused
+                m.background.color = "#1e293b"
+                m.background.opacity = 0.8
+                m.categoryLabel.color = "#ffffff"
+            end if
+        end sub
+        ]]>
+    </script>
+</component>

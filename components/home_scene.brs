@@ -1953,6 +1953,34 @@ function detectStreamFormat(url as string) as string
     ' Convert to lowercase for case-insensitive comparison
     urlLower = LCase(url)
     
+    ' Check for IPTV-style URLs with numeric path segments (e.g., /stream/channelid/123456)
+    ' These should be treated as MPEG-TS even without .ts extension
+    lastSlashPos = 0
+    for i = Len(urlLower) to 1 step -1
+        if Mid(urlLower, i, 1) = "/"
+            lastSlashPos = i
+            exit for
+        end if
+    end for
+    
+    if lastSlashPos > 0
+        lastSegment = Mid(url, lastSlashPos + 1)
+        ' Check if last segment is numeric (IPTV channel ID pattern)
+        isNumeric = true
+        for i = 1 to Len(lastSegment)
+            char = Mid(lastSegment, i, 1)
+            if char < "0" or char > "9"
+                isNumeric = false
+                exit for
+            end if
+        end for
+        
+        if isNumeric and Len(lastSegment) > 0
+            print "HomeScene.brs - [detectStreamFormat] Detected IPTV numeric channel URL - using 'ts' format"
+            return "ts"
+        end if
+    end if
+    
     ' Check for .ts extension (MPEG-TS streams)
     ' Note: Many IPTV providers use .ts URLs - use 'ts' format explicitly
     if Instr(1, urlLower, ".ts") > 0
@@ -2065,7 +2093,7 @@ sub showVideoPlayer(videoData as object)
     
     ' Detect stream format from URL
     detectedFormat = detectStreamFormat(finalUrl)
-    
+
     ' For MPEG-TS streams with credentials, attach roHttpAgent BEFORE creating content
     videoPlayerNode = m.videoPlayerScreen.findNode("VideoPlayer")
     if videoPlayerNode <> invalid and detectedFormat = "ts" and urlParts.hasCredentials
@@ -2082,8 +2110,23 @@ sub showVideoPlayer(videoData as object)
     videoContent.url = finalUrl
     videoContent.title = videoData.title
     
+    print "HomeScene.brs - [showVideoPlayer] =========================================="
+    print "HomeScene.brs - [showVideoPlayer] VIDEO CONTENT CONFIGURATION:"
+    print "HomeScene.brs - [showVideoPlayer] URL: " + finalUrl
+    print "HomeScene.brs - [showVideoPlayer] Title: " + videoData.title
+    print "HomeScene.brs - [showVideoPlayer] Has credentials in URL: " + urlParts.hasCredentials.ToStr()
+    if urlParts.hasCredentials
+        print "HomeScene.brs - [showVideoPlayer] Auth method: roHttpAgent with Basic Auth header"
+    end if
+    print "HomeScene.brs - [showVideoPlayer] =========================================="
+    
     ' Set stream format (use both lowercase and uppercase for compatibility)
-    if detectedFormat <> "" then
+    if detectedFormat = "ts"
+        ' Use explicit "ts" format for MPEG-TS streams
+        videoContent.streamformat = "ts"
+        videoContent.StreamFormat = "ts"
+        print "HomeScene.brs - [showVideoPlayer] Setting streamFormat: ts"
+    else if detectedFormat <> "" then
         videoContent.streamformat = detectedFormat
         videoContent.StreamFormat = detectedFormat
         print "HomeScene.brs - [showVideoPlayer] Setting streamFormat: " + detectedFormat
@@ -2102,14 +2145,23 @@ sub showVideoPlayer(videoData as object)
     ' Important for MPEG-TS: Sticky redirects and ignore stream errors
     if detectedFormat = "ts"
         videoContent.StreamStickyHttpRedirects = [true]
+        
         ' Be lenient with malformed metadata in MPEG-TS streams
-        videoContent.IgnoreStreamErrors = true
-        ' Disable trick play to reduce parsing strictness
-        videoContent.EnableTrickPlay = false
+        videoContent.IgnoreStreamErrors = true  ' Changed from false
+        
         ' Additional properties for error tolerance
-        videoContent.MinBandwidth = 0
-        videoContent.MaxBandwidth = 0
-        print "HomeScene.brs - [showVideoPlayer] Set MPEG-TS specific properties (lenient mode)"
+        videoContent.MinBandwidth = 0           ' NEW - no bandwidth limits
+        videoContent.MaxBandwidth = 0           ' NEW - no bandwidth limits
+        
+        print "HomeScene.brs - [showVideoPlayer] =========================================="
+        print "HomeScene.brs - [showVideoPlayer] MPEG-TS LENIENT MODE (yesterday's working config):"
+        print "HomeScene.brs - [showVideoPlayer]   - streamFormat: ts"
+        print "HomeScene.brs - [showVideoPlayer]   - IgnoreStreamErrors: true"
+        print "HomeScene.brs - [showVideoPlayer]   - StreamStickyHttpRedirects: [true]"
+        print "HomeScene.brs - [showVideoPlayer]   - MinBandwidth: 0"
+        print "HomeScene.brs - [showVideoPlayer]   - MaxBandwidth: 0"
+        print "HomeScene.brs - [showVideoPlayer]   - live: true"
+        print "HomeScene.brs - [showVideoPlayer] =========================================="
     end if
     
     ' For MPEG-TS with auth, also set HttpHeaders as fallback
@@ -2127,10 +2179,21 @@ sub showVideoPlayer(videoData as object)
     end if
     
     ' Add debugging for video content
-    print "HomeScene.brs - [showVideoPlayer] Video content created:"
+    print "HomeScene.brs - [showVideoPlayer] =========================================="
+    print "HomeScene.brs - [showVideoPlayer] FINAL VIDEO CONTENT PROPERTIES:"
     print "HomeScene.brs - [showVideoPlayer] URL: " + videoContent.url
     print "HomeScene.brs - [showVideoPlayer] Title: " + videoContent.title
-    print "HomeScene.brs - [showVideoPlayer] Stream Format: " + videoContent.streamFormat
+    streamFormatDisplay = videoContent.streamFormat
+    if streamFormatDisplay = "" then streamFormatDisplay = "AUTO-DETECT"
+    print "HomeScene.brs - [showVideoPlayer] Stream Format: " + streamFormatDisplay
+    print "HomeScene.brs - [showVideoPlayer] Live: " + videoContent.live.ToStr()
+    if detectedFormat = "ts"
+        print "HomeScene.brs - [showVideoPlayer] IgnoreStreamErrors: " + videoContent.IgnoreStreamErrors.ToStr()
+        hasAgent = (videoPlayerNode <> invalid and videoPlayerNode.GetHttpAgent() <> invalid)
+        print "HomeScene.brs - [showVideoPlayer] roHttpAgent: " + hasAgent.ToStr()
+    end if
+    print "HomeScene.brs - [showVideoPlayer] =========================================="
+    print "HomeScene.brs - [showVideoPlayer] Starting playback..."
     
     ' Set content and show video player
     m.videoPlayerScreen.content = videoContent
@@ -2777,12 +2840,69 @@ sub onVideoStateChanged()
                 hideVideoPlayer()
             else if videoPlayerNode.state = "playing"
                 print "HomeScene.brs - [onVideoStateChanged] Video is now playing successfully"
+                ' Reset buffering timer
+                if m.bufferingStartTime <> invalid
+                    currentTime = CreateObject("roDateTime").AsSeconds()
+                    totalBufferingTime = currentTime - m.bufferingStartTime
+                    print "HomeScene.brs - [onVideoStateChanged] Total buffering time: " + totalBufferingTime.ToStr() + " seconds"
+                    m.bufferingStartTime = invalid
+                end if
             else if videoPlayerNode.state = "buffering"
                 print "HomeScene.brs - [onVideoStateChanged] Video is buffering..."
+                ' Check if buffering is taking too long (potential issue)
+                if m.bufferingStartTime = invalid
+                    m.bufferingStartTime = CreateObject("roDateTime").AsSeconds()
+                    print "HomeScene.brs - [onVideoStateChanged] Buffering started at: " + m.bufferingStartTime.ToStr()
+                else
+                    currentTime = CreateObject("roDateTime").AsSeconds()
+                    bufferingDuration = currentTime - m.bufferingStartTime
+                    print "HomeScene.brs - [onVideoStateChanged] Been buffering for: " + bufferingDuration.ToStr() + " seconds"
+                    
+                    if bufferingDuration > 15
+                        print "HomeScene.brs - [onVideoStateChanged] *** WARNING: Buffering > 15 seconds ***"
+                        print "HomeScene.brs - [onVideoStateChanged] Possible issues:"
+                        print "HomeScene.brs - [onVideoStateChanged]   - Malformed stream data (IgnoreStreamErrors may be hiding error)"
+                        print "HomeScene.brs - [onVideoStateChanged]   - Server down/slow"
+                        print "HomeScene.brs - [onVideoStateChanged]   - Network connectivity"
+                        print "HomeScene.brs - [onVideoStateChanged]   - Stream format incompatibility"
+                        
+                        ' Check for errors even with IgnoreStreamErrors=true
+                        if videoPlayerNode.errorMsg <> "" and videoPlayerNode.errorMsg <> invalid
+                            print "HomeScene.brs - [onVideoStateChanged] *** ERROR DETECTED: " + videoPlayerNode.errorMsg
+                            if videoPlayerNode.errorCode <> invalid
+                                print "HomeScene.brs - [onVideoStateChanged] Error Code: " + videoPlayerNode.errorCode.ToStr()
+                            end if
+                        else
+                            print "HomeScene.brs - [onVideoStateChanged] No error message (might be stuck in retry loop)"
+                        end if
+                        
+                        ' Try to get more diagnostics
+                        if videoPlayerNode.streamInfo <> invalid
+                            print "HomeScene.brs - [onVideoStateChanged] Stream Info: " + FormatJson(videoPlayerNode.streamInfo)
+                        end if
+                    end if
+                    
+                    ' Force stop after 30 seconds of buffering
+                    if bufferingDuration > 30
+                        print "HomeScene.brs - [onVideoStateChanged] *** BUFFERING TIMEOUT (30s) ***"
+                        print "HomeScene.brs - [onVideoStateChanged] Stream is not playable - stopping playback"
+                        hideVideoPlayer()
+                    end if
+                end if
             else if videoPlayerNode.state = "paused"
                 print "HomeScene.brs - [onVideoStateChanged] Video is paused"
             else if videoPlayerNode.state = "stopped"
                 print "HomeScene.brs - [onVideoStateChanged] Video is stopped"
+                ' Check if there was an error that caused the stop
+                if videoPlayerNode.errorMsg <> "" and videoPlayerNode.errorMsg <> invalid
+                    print "HomeScene.brs - [onVideoStateChanged] *** ERROR DETECTED ON STOP ***"
+                    print "HomeScene.brs - [onVideoStateChanged] Error Message: " + videoPlayerNode.errorMsg
+                    if videoPlayerNode.errorCode <> invalid
+                        print "HomeScene.brs - [onVideoStateChanged] Error Code: " + videoPlayerNode.errorCode.ToStr()
+                    end if
+                    print "HomeScene.brs - [onVideoStateChanged] Note: IgnoreStreamErrors=true, but stream still failed to play"
+                    print "HomeScene.brs - [onVideoStateChanged] This indicates a critical error that cannot be ignored"
+                end if
             end if
         end if
     end if

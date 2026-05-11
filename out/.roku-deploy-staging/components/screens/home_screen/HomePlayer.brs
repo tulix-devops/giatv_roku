@@ -68,6 +68,28 @@ function detectStreamFormat(url as string) as string
     
     urlLower = LCase(url)
     
+    ' Check for IPTV-style URLs with numeric path segments (e.g., /123456)
+    lastSlashPos = 0
+    for i = Len(urlLower) to 1 step -1
+        if Mid(urlLower, i, 1) = "/"
+            lastSlashPos = i
+            exit for
+        end if
+    end for
+    
+    if lastSlashPos > 0
+        lastSegment = Mid(url, lastSlashPos + 1)
+        isNumeric = true
+        for i = 1 to Len(lastSegment)
+            char = Mid(lastSegment, i, 1)
+            if char < "0" or char > "9"
+                isNumeric = false
+                exit for
+            end if
+        end for
+        if isNumeric and Len(lastSegment) > 0 then return "ts"
+    end if
+    
     if Instr(1, urlLower, ".ts") > 0 then return "ts"
     if Instr(1, urlLower, ".m3u8") > 0 then return "hls"
     if Instr(1, urlLower, ".mp4") > 0 then return "mp4"
@@ -93,8 +115,9 @@ sub onContentURLChanged()
         ' MPEG-TS specific properties for error tolerance
         if detectedFormat = "ts"
             content.StreamStickyHttpRedirects = [true]
+            ' Be lenient with malformed metadata in MPEG-TS streams
             content.IgnoreStreamErrors = true
-            content.EnableTrickPlay = false
+            ' Additional properties for error tolerance
             content.MinBandwidth = 0
             content.MaxBandwidth = 0
             content.live = true

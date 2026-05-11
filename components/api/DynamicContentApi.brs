@@ -5,6 +5,33 @@ end sub
 sub GetDynamicContentData()
     contentTypeId = m.top.contentTypeId
     
+    ' OPTIMIZATION: Check cache first (valid for 10 minutes)
+    ' Use contentTypeId + page number for cache key
+    pageNum = 1
+    if contentTypeId = 14 and m.top.pageNumber <> invalid
+        pageNum = m.top.pageNumber
+        if pageNum < 1 then pageNum = 1
+    end if
+    cacheKey = "content_" + contentTypeId.ToStr() + "_page_" + pageNum.ToStr()
+    cachedContent = readCache(cacheKey, 600) ' 10 minutes = 600 seconds
+    
+    if cachedContent <> invalid
+        print "DynamicContentApi.brs - [GetDynamicContentData] *** USING CACHED CONTENT (type " + contentTypeId.ToStr() + ", page " + pageNum.ToStr() + ") ***"
+        parsedCache = ParseJson(cachedContent)
+        if parsedCache <> invalid
+            m.top.responseData = cachedContent
+            if contentTypeId = 14
+                processResponseWithPagination(cachedContent, contentTypeId)
+            else
+                processResponse(cachedContent, contentTypeId)
+            end if
+            ' Still fetch fresh data in background to update cache
+            print "DynamicContentApi.brs - [GetDynamicContentData] Fetching fresh data in background to update cache"
+        end if
+    else
+        print "DynamicContentApi.brs - [GetDynamicContentData] No valid cache for type " + contentTypeId.ToStr() + ", fetching from API"
+    end if
+    
     ' Get access token from registry
     authDataJson = RegRead("authData", "AUTH")
     accessToken = ""
@@ -33,11 +60,13 @@ sub GetDynamicContentData()
     url = "https://giatv.dineo.uk/api/" + apiEndpoint
     
     ' Add pagination for User Channels (contentTypeId = 14)
+    ' OPTIMIZATION: Only load page 1 at startup, load more on demand
     if contentTypeId = 14
         pageNum = m.top.pageNumber
         if pageNum < 1 then pageNum = 1
         url = url + "?page=" + pageNum.ToStr()
         print "DynamicContentApi.brs - [GetDynamicContentData] User Channels URL with pagination: " + url
+        print "DynamicContentApi.brs - [GetDynamicContentData] OPTIMIZATION: Loading page " + pageNum.ToStr() + " only"
     end if
     
     request = CreateObject("roUrlTransfer")
@@ -53,19 +82,8 @@ sub GetDynamicContentData()
     request.AddHeader("Content-Type", "application/json")
     request.AddHeader("Accept", "application/json")
     
-    ' User Channels (14) needs synchronous GetToString for proper response handling
-    if contentTypeId = 14
-        print "DynamicContentApi.brs - [GetDynamicContentData] Fetching User Channels page " + m.top.pageNumber.ToStr()
-        response = request.GetToString()
-        if response <> "" and response <> invalid
-            processResponseWithPagination(response, contentTypeId)
-        else
-            useDefaultContent(contentTypeId)
-        end if
-        return
-    end if
-    
-    ' All other content types use async for parallel loading
+    ' OPTIMIZATION: Changed User Channels to ASYNC for better performance
+    ' All content types now use async for non-blocking parallel loading
     port = CreateObject("roMessagePort")
     request.SetMessagePort(port)
     
@@ -76,7 +94,12 @@ sub GetDynamicContentData()
             response = msg.GetString()
             
             if responseCode >= 200 and responseCode < 300 and response <> ""
-                processResponse(response, contentTypeId)
+                ' User Channels uses special pagination handler
+                if contentTypeId = 14
+                    processResponseWithPagination(response, contentTypeId)
+                else
+                    processResponse(response, contentTypeId)
+                end if
             else
                 useDefaultContent(contentTypeId)
             end if
@@ -122,6 +145,14 @@ sub processResponseWithPagination(response as string, contentTypeId as integer)
         if dataInterface <> invalid
             print "DynamicContentApi.brs - [processResponseWithPagination] Found " + responseDataField.Count().ToStr() + " items on this page"
             m.top.responseData = response
+            
+            ' OPTIMIZATION: Cache the response
+            pageNum = m.top.pageNumber
+            if pageNum < 1 then pageNum = 1
+            cacheKey = "content_" + contentTypeId.ToStr() + "_page_" + pageNum.ToStr()
+            writeCache(cacheKey, response)
+            print "DynamicContentApi.brs - [processResponseWithPagination] *** CACHED CONTENT (type " + contentTypeId.ToStr() + ", page " + pageNum.ToStr() + ") ***"
+            
             userChannelsContentItems = convertUserChannelsToContentItems(responseDataField)
             m.top.contentItems = userChannelsContentItems
             return
@@ -161,6 +192,11 @@ sub processResponse(response as string, contentTypeId as integer)
 
     if hasValidData
         m.top.responseData = response
+        
+        ' OPTIMIZATION: Cache the response
+        cacheKey = "content_" + contentTypeId.ToStr() + "_page_1"
+        writeCache(cacheKey, response)
+        print "DynamicContentApi.brs - [processResponse] *** CACHED CONTENT (type " + contentTypeId.ToStr() + ") ***"
 
         if contentTypeId = 17
             tvGuideContentItems = convertTVGuideToContentItems(responseDataField)
@@ -541,8 +577,78 @@ function convertUserChannelsToContentItems(userChannelItems as object) as object
 end function
 
 function RegRead(key, section = invalid)
-    if section = invalid section = "Default"
+    if section = invalid then section = "Default"
     sec = CreateObject("roRegistrySection", section)
-    if sec.Exists(key) return sec.Read(key)
-    return sec.Read(key)
+    if sec.Exists(key) then return sec.Read(key)
+    return invalid
 end function
+
+' ==================== CACHE UTILITIES ====================
+
+function readCache(cacheKey as string, maxAge as integer) as dynamic
+    ' Read cached data if it exists and is not expired
+    ' maxAge is in seconds (e.g., 600 = 10 minutes)
+    
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    ' Check if cache exists
+    if not sec.Exists(cacheKey) then return invalid
+    if not sec.Exists(cacheKey + "_timestamp") then return invalid
+    
+    ' Read cache data and timestamp
+    cacheData = sec.Read(cacheKey)
+    timestampStr = sec.Read(cacheKey + "_timestamp")
+    
+    if cacheData = invalid or timestampStr = invalid then return invalid
+    
+    ' Check if cache is still valid
+    currentTime = CreateObject("roDateTime").AsSeconds()
+    cacheTime = timestampStr.ToInt()
+    age = currentTime - cacheTime
+    
+    if age > maxAge
+        print "Cache expired for '" + cacheKey + "' (age: " + age.ToStr() + "s, max: " + maxAge.ToStr() + "s)"
+        return invalid
+    end if
+    
+    print "Cache hit for '" + cacheKey + "' (age: " + age.ToStr() + "s)"
+    return cacheData
+end function
+
+sub writeCache(cacheKey as string, data as string)
+    ' Write data to cache with current timestamp
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    ' Store data
+    sec.Write(cacheKey, data)
+    
+    ' Store timestamp
+    currentTime = CreateObject("roDateTime").AsSeconds()
+    sec.Write(cacheKey + "_timestamp", currentTime.ToStr())
+    
+    ' Flush to disk
+    sec.Flush()
+    
+    print "Cached '" + cacheKey + "' at " + currentTime.ToStr()
+end sub
+
+sub clearCache(cacheKey = invalid as dynamic)
+    ' Clear specific cache key or all cache if cacheKey is invalid
+    section = "CACHE"
+    sec = CreateObject("roRegistrySection", section)
+    
+    if cacheKey <> invalid
+        ' Clear specific cache
+        sec.Delete(cacheKey)
+        sec.Delete(cacheKey + "_timestamp")
+        print "Cleared cache for: " + cacheKey
+    else
+        ' Clear all cache
+        sec.Delete()
+        print "Cleared all cache"
+    end if
+    
+    sec.Flush()
+end sub
