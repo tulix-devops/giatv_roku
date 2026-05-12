@@ -230,8 +230,9 @@ sub initializeHomeScreen()
 
         if vodCat.isLiveSection <> invalid and vodCat.isLiveSection = true
             isLiveSection = true
-            rowItemSizes.Push([320, 180])
-            rowHeights.Push(200.0)
+            ' Live sections: 6 items per row (landscape)
+            rowItemSizes.Push([280, 196])
+            rowHeights.Push(220.0)
         else 
             ' Check if this category contains TV shows (typeId = 2)
             for each vodData in vodCat.VodEntityData
@@ -242,11 +243,11 @@ sub initializeHomeScreen()
             end for
             
             if isTvShowSection
-                ' TV Shows use same dimensions as Live channels
-                rowItemSizes.Push([320, 180])
-                rowHeights.Push(200.0)
+                ' TV Shows: 6 items per row (landscape)
+                rowItemSizes.Push([280, 196])
+                rowHeights.Push(220.0)
             else
-                ' VOD Movies use larger dimensions
+                ' VOD Movies: keep existing portrait dimensions (not touched)
                 rowItemSizes.Push([300, 420])
                 rowHeights.Push(440.0)
             end if
@@ -318,7 +319,28 @@ sub initializeHomeScreen()
     m.rowList.content = hvc
     m.rowList.rowItemSize = rowItemSizes
     m.rowList.rowHeights = rowHeights
+    
+    ' Set up spacing arrays for different row types
+    itemSpacingArray = []
+    rowItemSpacingArray = []
+    
+    ' Build spacing arrays matching the row configuration
+    for i = 0 to rowItemSizes.Count() - 1
+        itemSize = rowItemSizes[i]
+        if itemSize[0] = 280 and itemSize[1] = 196
+            ' Landscape rows (Live/TV Shows): tighter horizontal spacing for 6 items
+            rowItemSpacingArray.Push([15, 15])
+        else
+            ' Portrait rows (Movies): default spacing
+            rowItemSpacingArray.Push([15, 20])
+        end if
+        
+        ' Vertical spacing between rows
+        itemSpacingArray.Push([0, 80])
+    end for
+    
     m.rowList.itemSpacing = [0, 80]
+    m.rowList.rowItemSpacing = rowItemSpacingArray
     m.rowList.itemSize = [1920, 520]
     m.rowList.rowLabelFont = defaultFont
     m.contentContainer.appendChild(m.rowList)

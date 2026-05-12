@@ -3,8 +3,8 @@
     <interface>
         <field id="itemContent" type="node" onChange="OnContentSet"/>
         <field id="focusPercent" type="float" onChange="showFocus"/>
-        <field id="width" type="float" value="350"/>
-        <field id="height" type="float" value="245"/>
+        <field id="width" type="float" value="350" onChange="updateSize"/>
+        <field id="height" type="float" value="245" onChange="updateSize"/>
     </interface>
 
     <script type="text/brightscript" uri="pkg:/components/widgets/SeriesItemComponent.brs"/>
@@ -13,7 +13,7 @@
         <!-- Main Container -->
         <Group id="itemContainer" translation="[0, 0]">
             
-            <!-- Poster Image (16:9 landscape) -->
+            <!-- Poster Image (16:9 landscape) - size will be updated dynamically -->
             <Poster
                 id="posterImage"
                 width="350"
@@ -33,7 +33,7 @@
                 visible="false"
                 loadDisplayMode="noScale"/>
             
-            <!-- Title Label -->
+            <!-- Title Label - position will be updated dynamically -->
             <Label
                 id="titleLabel"
                 text=""

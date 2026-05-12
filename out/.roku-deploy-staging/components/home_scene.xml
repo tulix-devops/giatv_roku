@@ -22,18 +22,18 @@
   <children>
     <!-- Content Expand/Collapse Animations -->
     <Animation id="expandContentAnimation" duration="0.25" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="expandContentInterpolator" key="[0.0, 1.0]" keyValue="[[240, 0], [0, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
+      <Vector2DFieldInterpolator id="expandContentInterpolator" key="[0.0, 1.0]" keyValue="[[360, 0], [0, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
     </Animation>
     <Animation id="collapseContentAnimation" duration="0.25" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="collapseContentInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [240, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
+      <Vector2DFieldInterpolator id="collapseContentInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [360, 0]]" fieldToInterp="dynamicScreensContainer.translation"/>
     </Animation>
     
     <!-- Banner Expand/Collapse Animations -->
     <Animation id="expandBannerAnimation" duration="0.25" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="expandBannerInterpolator" key="[0.0, 1.0]" keyValue="[[240, 0], [0, 0]]" fieldToInterp="homeBannerGroup.translation"/>
+      <Vector2DFieldInterpolator id="expandBannerInterpolator" key="[0.0, 1.0]" keyValue="[[360, 0], [0, 0]]" fieldToInterp="homeBannerGroup.translation"/>
     </Animation>
     <Animation id="collapseBannerAnimation" duration="0.25" easeFunction="outCubic">
-      <Vector2DFieldInterpolator id="collapseBannerInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [240, 0]]" fieldToInterp="homeBannerGroup.translation"/>
+      <Vector2DFieldInterpolator id="collapseBannerInterpolator" key="[0.0, 1.0]" keyValue="[[0, 0], [360, 0]]" fieldToInterp="homeBannerGroup.translation"/>
     </Animation>
 
     <Rectangle
@@ -42,15 +42,15 @@
             height="1080"
             color="#0f1419" translation="[0, 0]"/>
     
-    <!-- Home Banner (positioned to align with content area, right of 240px nav bar) -->
-    <Group id="homeBannerGroup" translation="[240, 0]" visible="false" z="1" opacity="1.0">
+    <!-- Home Banner (positioned to align with content area, right of 360px nav bar) -->
+    <Group id="homeBannerGroup" translation="[360, 0]" visible="false" z="1" opacity="1.0">
       <!-- Banner Image (full height 1080, width 2160 to cover full screen in both collapsed and expanded states) -->
         <Poster
           id="homeBanner"
           uri="pkg:/images/img/new_banner_screen.jpg"
           width="2160"
           height="1080"
-          translation="[-240, 0]"
+          translation="[-360, 0]"
           loadDisplayMode="scaleToFill"
           opacity="1.0" />
       
@@ -94,11 +94,11 @@
     <!-- NEW: Markup-based Navigation (proven approach) -->
     <markup_navigation_bar id="markup_navigation_bar" translation="[0, 0]" visible="false" />
     <!-- Dynamic content screens will be created programmatically -->
-    <Group id="dynamicScreensContainer" translation="[240, 0]" z="2" />
+    <Group id="dynamicScreensContainer" translation="[360, 0]" z="2" />
     
     <!-- Static screens - z value lower than nav bar (z=10) to render behind it -->
-    <search_screen id="search_screen" translation="[240, 0]" visible="false" z="5" />
-    <account_screen id="account_screen" translation="[240, 0]" visible="false" z="5" />
+    <search_screen id="search_screen" translation="[360, 0]" visible="false" z="5" />
+    <account_screen id="account_screen" translation="[360, 0]" visible="false" z="5" />
     <!-- <podcast_screen id ="podcast_screen" translation="[140, 0]" visible="false" /> -->
     <login_screen id ="login_screen" translation="[0, 0]" visible="false" />
     <!-- <Animation

@@ -349,9 +349,9 @@ sub repositionAllScreens(visibleIndex as integer)
     accountIndex = getAccountScreenIndex()
     staticAccountScreen = m.top.findNode("account_screen")
     if visibleIndex = accountIndex and staticAccountScreen <> invalid
-        staticAccountScreen.translation = [240, 0]  ' Right of 240px nav bar (static position)
+        staticAccountScreen.translation = [360, 0]  ' Right of 360px nav bar (static position)
         staticAccountScreen.visible = true
-        print "HomeScene.brs - [repositionAllScreens] Account screen positioned at [240, 0] (visible)"
+        print "HomeScene.brs - [repositionAllScreens] Account screen positioned at [360, 0] (visible)"
         
         ' Ensure all other screens are properly hidden when Account is visible
         for each key in m.dynamicContentScreens.Keys()
@@ -362,9 +362,9 @@ sub repositionAllScreens(visibleIndex as integer)
             end if
         end for
     else if staticAccountScreen <> invalid
-        staticAccountScreen.translation = [240, 5400]  ' Off-screen below
+        staticAccountScreen.translation = [360, 5400]  ' Off-screen below
         staticAccountScreen.visible = false
-        print "HomeScene.brs - [repositionAllScreens] Account screen positioned at [240, 5400] (hidden)"
+        print "HomeScene.brs - [repositionAllScreens] Account screen positioned at [360, 5400] (hidden)"
         
         ' Restore visibility of the currently visible screen
         if visibleIndex >= 0 and visibleIndex < m.dynamicContentScreens.Count()
@@ -754,9 +754,9 @@ sub showAccountScreen()
     
     ' Position and show the account screen
     ' Note: Static account_screen is NOT inside dynamicScreensContainer, so position is absolute
-    accountScreen.translation = [240, 0]  ' Right of 240px nav bar (static screen position)
+    accountScreen.translation = [360, 0]  ' Right of 360px nav bar (static screen position)
     accountScreen.visible = true
-    print "HomeScene.brs - [showAccountScreen] Account screen positioned at [240, 0]"
+    print "HomeScene.brs - [showAccountScreen] Account screen positioned at [360, 0]"
     
     ' Ensure account screen is focusable but DON'T give it focus yet
     accountScreen.focusable = true
@@ -983,7 +983,7 @@ sub createContentScreenForNavItem(navItem as object, index as integer)
     contentScreen.observeField("videoPlayRequested", "onVideoPlayRequested")
     
     ' Position screens: visible screen at [0, 0] inside container, others hidden off-screen right
-    ' Container handles the offset (starts at [240, 0], animates to [0, 0] when nav collapses)
+    ' Container handles the offset (starts at [360, 0], animates to [0, 0] when nav collapses)
     if index = 0
         contentScreen.translation = [0, 0]  ' Visible screen at origin inside container
         print "HomeScene.brs - [createContentScreenForNavItem] Screen " + index.ToStr() + " positioned at [0, 0] (visible)"

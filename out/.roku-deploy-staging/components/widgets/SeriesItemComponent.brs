@@ -3,6 +3,9 @@ sub init()
     m.titleLabel = m.top.findNode("titleLabel")
     m.liveBadge = m.top.findNode("liveBadge")
     m.itemContainer = m.top.findNode("itemContainer")
+    
+    ' Initialize size based on width/height fields
+    updateSize()
 end sub
 
 sub OnContentSet()
@@ -103,9 +106,25 @@ sub updateSize()
     ' Calculate poster height for 16:9 aspect ratio
     posterHeight = Int(width * 9 / 16)
     
+    ' Update poster size
     m.posterImage.width = width
     m.posterImage.height = posterHeight
     
+    ' Update title label
     m.titleLabel.width = width
     m.titleLabel.translation = [0, posterHeight + 6]
+    
+    ' Scale live badge proportionally (based on width)
+    ' Default badge is 50x30 for width=350
+    ' Scale factor: width / 350
+    if m.liveBadge <> invalid
+        scaleFactor = width / 350.0
+        badgeWidth = Int(50 * scaleFactor)
+        badgeHeight = Int(30 * scaleFactor)
+        badgePadding = Int(10 * scaleFactor)
+        
+        m.liveBadge.width = badgeWidth
+        m.liveBadge.height = badgeHeight
+        m.liveBadge.translation = [badgePadding, badgePadding]
+    end if
 end sub

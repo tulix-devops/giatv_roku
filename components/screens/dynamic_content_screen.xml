@@ -156,21 +156,21 @@
       rowCounterRightOffset="80"
       height="1000" />
     
-    <!-- GridView for User Channels (landscape grid layout) -->
+    <!-- GridView for User Channels (landscape grid layout - 6 items per row) -->
     <MarkupGrid
       id="userChannelsGrid"
       translation="[40, 175]"
       visible="false"
       focusable="true"
       itemComponentName="SeriesItemComponent"
-      numColumns="5"
+      numColumns="6"
       numRows="4"
-      itemSpacing="[20, 30]"
-      itemSize="[350, 245]"
+      itemSpacing="[15, 25]"
+      itemSize="[280, 196]"
       vertFocusAnimationStyle="fixedFocus"
       drawFocusFeedback="true"
       drawFocusFeedbackOnTop="true"
-      width="1500"
+      width="1760"
       rowCounterRightOffset="80"
       height="900" />
 

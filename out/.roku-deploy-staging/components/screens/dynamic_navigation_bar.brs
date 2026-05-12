@@ -688,18 +688,18 @@ end function
 
 sub createDynamicNavItem(navItem as object, yPosition as integer, index as integer)
     
-    ' Create group for navigation item
+    ' Create group for navigation item (centered in 360px width)
     navGroup = CreateObject("roSGNode", "Group")
     navGroup.id = "navItem_" + navItem.id.ToStr()
-    navGroup.translation = [15, yPosition]
+    navGroup.translation = [35, yPosition]  ' Centered: (360-290)/2 = 35px from left
     navGroup.focusable = true
     
-    ' Create focus indicator rectangle (initially hidden)
+    ' Create focus indicator rectangle (wider for better visual in 360px nav bar)
     focusIndicator = CreateObject("roSGNode", "Rectangle")
     focusIndicator.id = "focusIndicator_" + navItem.id.ToStr()
-    focusIndicator.width = 210
+    focusIndicator.width = 290  ' Wider to take advantage of space (was 210)
     focusIndicator.height = 60
-    focusIndicator.color = "#4FC3F7"
+    focusIndicator.color = "#0069a880"
     focusIndicator.opacity = 0.2
     focusIndicator.translation = [0, 0]
     focusIndicator.visible = false
@@ -716,8 +716,8 @@ sub createDynamicNavItem(navItem as object, yPosition as integer, index as integ
     navLabel.text = displayTitle
     navLabel.color = "#ffffff"
     navLabel.font = "font:MediumBoldSystemFont"
-    navLabel.translation = [20, 0]  ' Left padding of 20px
-    navLabel.width = 210  ' Same width as focus indicator (wider for "Age Restricted")
+    navLabel.translation = [30, 0]  ' Left padding of 30px for better centering
+    navLabel.width = 290  ' Same width as focus indicator (wider for better layout)
     navLabel.height = 60  ' Same height as focus indicator
     navLabel.horizAlign = "left"
     navLabel.vertAlign = "center"
@@ -1224,7 +1224,7 @@ sub makeNavItemActive(index as integer)
     
     if navLabel <> invalid
         print "DynamicNavigationBar.brs - [makeNavItemActive] Setting active style for: " + navLabel.text
-        navLabel.color = "#4FC3F7"
+        navLabel.color = "#0069a8"
         if navLabel.font <> invalid
             navLabel.font.size = 29
         end if

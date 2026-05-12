@@ -34,13 +34,23 @@ end sub
 
 
 sub OnContentSet()
-    print "RowListItemComponent.brs - [OnContentSet] Setting up modern portrait content"
-    
     content = m.top.itemContent
     if content = invalid
         print "RowListItemComponent.brs - [OnContentSet] Content is invalid"
         return
     end if
+    
+    ' Determine layout type based on content
+    isLandscape = false
+    if content.isLiveChannel <> invalid and content.isLiveChannel = true
+        isLandscape = true
+        print "RowListItemComponent.brs - [OnContentSet] Setting up landscape content (Live/TV Shows)"
+    else
+        print "RowListItemComponent.brs - [OnContentSet] Setting up portrait content (Movies)"
+    end if
+    
+    ' Apply appropriate layout
+    setupLayout(isLandscape)
     
     print "RowListItemComponent.brs - [OnContentSet] Content: " + FormatJson(content)
     
@@ -105,7 +115,75 @@ sub OnContentSet()
     ' Show content overlay
     m.contentOverlay.visible = true
     
-    print "RowListItemComponent.brs - [OnContentSet] Modern portrait content setup complete"
+    print "RowListItemComponent.brs - [OnContentSet] Layout setup complete"
+end sub
+
+sub setupLayout(isLandscape as boolean)
+    
+    if isLandscape
+        ' Landscape layout for Live channels and TV Shows (280x196)
+        m.cardBackground.width = 280
+        m.cardBackground.height = 196
+        
+        ' Poster takes most of the space
+        m.itemposter.width = 276
+        m.itemposter.height = 155
+        m.itemposter.translation = [2, 2]
+        
+        ' Compact overlay at bottom
+        m.contentOverlay.translation = [2, 157]
+        m.contentOverlay.findNode("overlayBackground").width = 276
+        m.contentOverlay.findNode("overlayBackground").height = 37
+        
+        ' Adjust title positioning and size
+        m.titleLabel.translation = [8, 4]
+        m.titleLabel.width = 250
+        m.titleLabel.height = 18
+        m.titleLabel.getChild(0).size = 14 ' Font size
+        
+        ' Hide description and meta labels for compact layout
+        m.descriptionLabel.visible = false
+        m.metaLabel.visible = false
+        
+        ' Adjust status container
+        m.contentOverlay.findNode("statusContainer").translation = [230, 4]
+        
+        ' Center play button for landscape
+        m.playButtonGroup.translation = [118, 65]
+        m.loadingGroup.translation = [128, 75]
+        
+    else
+        ' Portrait layout for Movies (280x420) - default layout
+        m.cardBackground.width = 280
+        m.cardBackground.height = 420
+        
+        m.itemposter.width = 276
+        m.itemposter.height = 350
+        m.itemposter.translation = [2, 2]
+        
+        m.contentOverlay.translation = [2, 352]
+        m.contentOverlay.findNode("overlayBackground").width = 276
+        m.contentOverlay.findNode("overlayBackground").height = 66
+        
+        ' Reset title positioning and size
+        m.titleLabel.translation = [12, 8]
+        m.titleLabel.width = 250
+        m.titleLabel.height = 28
+        m.titleLabel.getChild(0).size = 20 ' Font size
+        
+        ' Show description and meta labels
+        m.descriptionLabel.visible = true
+        m.metaLabel.visible = true
+        
+        ' Reset status container
+        m.contentOverlay.findNode("statusContainer").translation = [230, 8]
+        
+        ' Center play button for portrait
+        m.playButtonGroup.translation = [118, 155]
+        m.loadingGroup.translation = [128, 165]
+    end if
+    
+    print "RowListItemComponent.brs - [setupLayout] Layout applied successfully"
 end sub
 
 sub setupContentIndicators(content)

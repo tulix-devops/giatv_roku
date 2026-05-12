@@ -955,21 +955,21 @@ sub buildContentDisplay(contentItems as object)
         m.contentRowList.itemSize = [1920, 420]  ' Max row height
         m.contentRowList.rowLabelOffset = [[0, 8]]  ' Bring titles closer to items
         
-    ' Age Restricted (15) - Landscape cards (5 per row)
+    ' Age Restricted (15) - Landscape cards (6 per row)
     else if m.top.contentTypeId = 15
-        print "DynamicContentScreen.brs - [buildContentDisplay] Age Restricted content detected, using SeriesItemComponent (5 per row)"
+        print "DynamicContentScreen.brs - [buildContentDisplay] Age Restricted content detected, using SeriesItemComponent (6 per row)"
         m.contentRowList.itemComponentName = "SeriesItemComponent"
         
-        ' Size for 5 items per row: 340px width with 35px spacing
+        ' Size for 6 items per row: 280px width with 15px spacing (landscape layout)
         for i = 0 to contentNode.getChildCount() - 1
-            rowItemSizes.Push([340, 245])
-            rowHeights.Push(270.0)
+            rowItemSizes.Push([280, 196])
+            rowHeights.Push(220.0)
         end for
         m.contentRowList.rowItemSize = rowItemSizes
         m.contentRowList.rowHeights = rowHeights
-        m.contentRowList.rowItemSpacing = [[35, 15]]
-        m.contentRowList.itemSize = [1920, 290]
-        m.contentRowList.rowLabelOffset = [[0, 10]]
+        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.itemSize = [1920, 240]
+        m.contentRowList.rowLabelOffset = [[0, 8]]
         
     ' User Channels (14) - Use GridView instead of RowList
     else if m.top.contentTypeId = 14
@@ -979,17 +979,57 @@ sub buildContentDisplay(contentItems as object)
         buildUserChannelsGrid(contentNode)
         return
         
-    ' Series (2), Live TV (3), Personal (16), TV Guide (17) - Landscape cards (4 per row + half peek)
-    else if m.top.contentTypeId = 2 or m.top.contentTypeId = 3 or m.top.contentTypeId = 16 or m.top.contentTypeId = 17
-        if m.top.contentTypeId = 2
-            print "DynamicContentScreen.brs - [buildContentDisplay] Series content detected, using SeriesItemComponent"
-        else if m.top.contentTypeId = 3
-            print "DynamicContentScreen.brs - [buildContentDisplay] Live TV content detected, using SeriesItemComponent"
-        else if m.top.contentTypeId = 16
-            print "DynamicContentScreen.brs - [buildContentDisplay] Personal content detected, using SeriesItemComponent"
-        else if m.top.contentTypeId = 17
-            print "DynamicContentScreen.brs - [buildContentDisplay] TV Guide content detected, using SeriesItemComponent"
-        end if
+    ' Personal (16) - Landscape cards (6 per row)
+    else if m.top.contentTypeId = 16
+        print "DynamicContentScreen.brs - [buildContentDisplay] Personal content detected, using SeriesItemComponent (6 per row)"
+        m.contentRowList.itemComponentName = "SeriesItemComponent"
+        
+        ' Size for 6 items per row: 280px width with 15px spacing (landscape layout)
+        for i = 0 to contentNode.getChildCount() - 1
+            rowItemSizes.Push([280, 196])
+            rowHeights.Push(220.0)
+        end for
+        m.contentRowList.rowItemSize = rowItemSizes
+        m.contentRowList.rowHeights = rowHeights
+        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.itemSize = [1920, 240]
+        m.contentRowList.rowLabelOffset = [[0, 8]]
+        
+    ' Series (2) - Landscape cards (6 per row)
+    else if m.top.contentTypeId = 2
+        print "DynamicContentScreen.brs - [buildContentDisplay] Series content detected, using SeriesItemComponent (6 per row)"
+        m.contentRowList.itemComponentName = "SeriesItemComponent"
+        
+        ' Size for 6 items per row: 280px width with 15px spacing (landscape layout)
+        for i = 0 to contentNode.getChildCount() - 1
+            rowItemSizes.Push([280, 196])
+            rowHeights.Push(220.0)
+        end for
+        m.contentRowList.rowItemSize = rowItemSizes
+        m.contentRowList.rowHeights = rowHeights
+        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.itemSize = [1920, 240]
+        m.contentRowList.rowLabelOffset = [[0, 8]]
+        
+    ' Live TV (3) - Landscape cards (6 per row)
+    else if m.top.contentTypeId = 3
+        print "DynamicContentScreen.brs - [buildContentDisplay] Live TV content detected, using SeriesItemComponent (6 per row)"
+        m.contentRowList.itemComponentName = "SeriesItemComponent"
+        
+        ' Size for 6 items per row: 280px width with 15px spacing (landscape layout)
+        for i = 0 to contentNode.getChildCount() - 1
+            rowItemSizes.Push([280, 196])
+            rowHeights.Push(220.0)
+        end for
+        m.contentRowList.rowItemSize = rowItemSizes
+        m.contentRowList.rowHeights = rowHeights
+        m.contentRowList.rowItemSpacing = [[15, 15]]
+        m.contentRowList.itemSize = [1920, 240]
+        m.contentRowList.rowLabelOffset = [[0, 8]]
+        
+    ' TV Guide (17) - Landscape cards (4 per row + half peek)
+    else if m.top.contentTypeId = 17
+        print "DynamicContentScreen.brs - [buildContentDisplay] TV Guide content detected, using SeriesItemComponent"
         m.contentRowList.itemComponentName = "SeriesItemComponent"
         
         ' Size for 4 items per row + half peek of 5th: 350px width, 197px image (16:9) + 48px title area = 245px height

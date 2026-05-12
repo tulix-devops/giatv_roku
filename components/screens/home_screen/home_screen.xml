@@ -11,13 +11,13 @@
   </interface>
   <children>
     <Group id="mainGroup" visible="true">
-      <Group id="contentContainer" translation="[160, 20]">
+      <Group id="contentContainer" translation="[280, 20]">
         <Poster
         uri="pkg:/images/png/gradient.jpeg"
         width="1920"
         height="1080"
         loadDisplayMode="scaleToFill"
-        translation="[-20, -20]"/>
+        translation="[100, -20]"/>
 
         <RowList 
           id = "exampleRowList" 
