@@ -8,11 +8,13 @@ sub init()
     m.channelCountLabel = m.top.findNode("channelCountLabel")
     m.selectedIndexLabel = m.top.findNode("selectedIndexLabel")
     m.searchPromptLabel = m.top.findNode("searchPromptLabel")
+    m.searchStatusBar = m.top.findNode("searchStatusBar")
     m.searchStatusGroup = m.top.findNode("searchStatusGroup")
     m.searchQueryText = m.top.findNode("searchQueryText")
     m.searchClearHint = m.top.findNode("searchClearHint")
     
     ' Category filter UI
+    m.categoryListContainer = m.top.findNode("categoryListContainer")
     m.categoryLabelList = m.top.findNode("categoryLabelList")
     m.selectedCategory = "all"  ' Default to "All"
     m.categories = []
@@ -29,10 +31,17 @@ sub init()
     m.previewPlayer = m.top.findNode("previewPlayer")
     m.previewStatusGroup = m.top.findNode("previewStatusGroup")
     m.previewStatusLabel = m.top.findNode("previewStatusLabel")
+    m.previewChannelName = m.top.findNode("previewChannelName")
     m.currentPreviewUrl = ""
     m.previewHasError = false
     m.lastFocusedRow = -1 ' Track previous row for scroll direction detection
     m.lastFocusedIndex = 0 ' Track last focused item for restoration after video playback
+    
+    ' New UI Elements
+    m.statsChannelCount = m.top.findNode("statsChannelCount")
+    m.optionsHintGroup = m.top.findNode("optionsHintGroup")
+    m.bottomNavHints = m.top.findNode("bottomNavHints")
+    m.sourceUrlLabel = m.top.findNode("sourceUrlLabel")
     
     print "M3UChannelScreen.brs - [init] categoryLabelList: " + Type(m.categoryLabelList)
     print "M3UChannelScreen.brs - [init] gridFadeOut: " + Type(m.gridFadeOut)
@@ -59,7 +68,6 @@ sub init()
     ' Header elements
     m.screenHeaderGroup = m.top.findNode("screenHeaderGroup")
     m.screenTabName = m.top.findNode("screenTabName")
-    m.screenDotSeparator = m.top.findNode("screenDotSeparator")
     m.screenTimeLabel = m.top.findNode("screenTimeLabel")
     m.clockTimer = m.top.findNode("clockTimer")
     
@@ -159,6 +167,10 @@ sub onM3uUrlChanged()
     print "M3UChannelScreen.brs - [onM3uUrlChanged] Screen visible: " + m.top.visible.ToStr()
     
     if m.top.m3uUrl <> "" and m.top.m3uUrl <> invalid
+        ' Update source URL display
+        if m.sourceUrlLabel <> invalid
+            m.sourceUrlLabel.text = m.top.m3uUrl
+        end if
         loadM3UPlaylist()
     end if
 end sub
@@ -624,6 +636,11 @@ sub extractAndBuildCategories()
         m.categoryLabelList.visible = true
         m.selectedCategory = "all"  ' Default to showing all channels
         
+        ' Show category container
+        if m.categoryListContainer <> invalid
+            m.categoryListContainer.visible = true
+        end if
+        
         ' Set initial selection to "All"
         m.categoryLabelList.jumpToItem = 0
         
@@ -638,7 +655,7 @@ sub extractAndBuildCategories()
         
         ' Position grid to the right of category sidebar
         if m.channelGridContainer <> invalid
-            m.channelGridContainer.translation = [330, 0]
+            m.channelGridContainer.translation = [360, 200]
             print "M3UChannelScreen.brs - [extractAndBuildCategories] Grid positioned with category sidebar offset"
         end if
         
@@ -649,6 +666,11 @@ sub extractAndBuildCategories()
         print "M3UChannelScreen.brs - [extractAndBuildCategories] No categories found - hiding category list"
         m.categoryLabelList.content = CreateObject("roSGNode", "ContentNode")
         m.categoryLabelList.visible = false
+        
+        ' Hide category container
+        if m.categoryListContainer <> invalid
+            m.categoryListContainer.visible = false
+        end if
         
         ' Set grid to 5 columns without category sidebar (full width)
         if m.channelGrid <> invalid
@@ -661,7 +683,7 @@ sub extractAndBuildCategories()
         
         ' Position grid to the left (no category sidebar)
         if m.channelGridContainer <> invalid
-            m.channelGridContainer.translation = [0, 0]
+            m.channelGridContainer.translation = [40, 200]
             print "M3UChannelScreen.brs - [extractAndBuildCategories] Grid positioned at full width (no categories)"
         end if
     end if
@@ -722,9 +744,18 @@ sub buildChannelGrid()
     updateChannelCounter()
     updateSelectedIndex()
     
-    ' Show search prompt
-    if m.searchPromptLabel <> invalid
-        m.searchPromptLabel.visible = true
+    ' Show options hint group (search prompt)
+    if m.optionsHintGroup <> invalid
+        m.optionsHintGroup.visible = true
+    end if
+    
+    ' Bottom navigation hints are always visible (no need to toggle)
+    
+    ' Show category container if categories exist
+    if m.categoryListContainer <> invalid and m.categoryLabelList <> invalid
+        if m.categoryLabelList.content <> invalid and m.categoryLabelList.content.getChildCount() > 0
+            m.categoryListContainer.visible = true
+        end if
     end if
     
     print "M3UChannelScreen.brs - [buildChannelGrid] Initial grid built with " + m.loadedChannels.ToStr() + " channels"
@@ -826,31 +857,47 @@ end sub
 sub updateChannelCounter()
     if m.channelCountLabel = invalid then return
     
+    counterText = ""
+    statsText = ""
+    
     if m.isSearchMode
         ' Show search results count
         if m.searchQuery <> ""
             totalMatches = m.filteredChannels.Count()
-            displayedCount = m.activeGrid.content.getChildCount()
+            displayedCount = 0
+            if m.activeGrid <> invalid and m.activeGrid.content <> invalid
+                displayedCount = m.activeGrid.content.getChildCount()
+            end if
             
             if displayedCount < totalMatches
-                ' Results are limited
-                counterText = "Showing " + displayedCount.ToStr() + " of " + totalMatches.ToStr() + " results for '" + m.searchQuery + "'"
+                counterText = "Showing " + displayedCount.ToStr() + " of " + totalMatches.ToStr() + " results"
+                statsText = displayedCount.ToStr() + " Results"
             else
-                ' All results shown
                 counterText = totalMatches.ToStr() + " results for '" + m.searchQuery + "'"
+                statsText = totalMatches.ToStr() + " Results"
             end if
         else
-            counterText = m.loadedChannels.ToStr() + " channels (search mode)"
+            counterText = m.loadedChannels.ToStr() + " Channels"
+            statsText = m.loadedChannels.ToStr() + " Channels"
         end if
-        m.channelCountLabel.text = counterText
-        m.channelCountLabel.visible = true
     else if m.totalChannels > 0
         ' Show normal channel count
-        counterText = m.loadedChannels.ToStr() + " of " + m.totalChannels.ToStr() + " channels loaded"
-        m.channelCountLabel.text = counterText
-        m.channelCountLabel.visible = true
+        if m.loadedChannels < m.totalChannels
+            counterText = "Loading... " + m.loadedChannels.ToStr() + " of " + m.totalChannels.ToStr()
+        else
+            counterText = "All " + m.loadedChannels.ToStr() + " channels loaded"
+        end if
+        statsText = m.totalChannels.ToStr() + " Channels"
     else
-        m.channelCountLabel.visible = false
+        counterText = "Loading..."
+        statsText = "0 Channels"
+    end if
+    
+    m.channelCountLabel.text = counterText
+    
+    ' Update stats card label
+    if m.statsChannelCount <> invalid
+        m.statsChannelCount.text = statsText
     end if
 end sub
 
@@ -932,8 +979,12 @@ end sub
 sub onSearchKeyboardClosed()
     print "M3UChannelScreen.brs - [onSearchKeyboardClosed] Keyboard dialog closed"
     
-    ' Return focus to active grid
-    if m.activeGrid <> invalid
+    ' Return focus to active grid (search results grid if in search mode)
+    if m.isSearchMode and m.searchResultsGrid <> invalid and m.searchResultsGrid.visible = true
+        print "M3UChannelScreen.brs - [onSearchKeyboardClosed] Setting focus on search results grid"
+        m.searchResultsGrid.setFocus(true)
+    else if m.activeGrid <> invalid
+        print "M3UChannelScreen.brs - [onSearchKeyboardClosed] Setting focus on active grid"
         m.activeGrid.setFocus(true)
     end if
 end sub
@@ -954,18 +1005,26 @@ sub enterSearchMode()
     m.isSearchMode = true
     m.activeGrid = m.searchResultsGrid
     
-    ' Hide category list when in search mode
+    ' Hide category list container when in search mode
+    if m.categoryListContainer <> invalid
+        m.categoryListContainer.visible = false
+        print "M3UChannelScreen.brs - [enterSearchMode] Category list container hidden"
+    end if
     if m.categoryLabelList <> invalid
         m.categoryLabelList.visible = false
-        print "M3UChannelScreen.brs - [enterSearchMode] Category list hidden"
     end if
     
-    ' Hide search prompt, show search status
-    if m.searchPromptLabel <> invalid
-        m.searchPromptLabel.visible = false
+    ' Hide options hint group, show search status bar
+    if m.optionsHintGroup <> invalid
+        m.optionsHintGroup.visible = false
     end if
-    if m.searchStatusGroup <> invalid
-        m.searchStatusGroup.visible = true
+    if m.searchStatusBar <> invalid
+        m.searchStatusBar.visible = true
+    end if
+    
+    ' Move grid to full width when no categories (search mode)
+    if m.channelGridContainer <> invalid
+        m.channelGridContainer.translation = [40, 200]
     end if
     
     ' Update search display
@@ -979,18 +1038,26 @@ sub exitSearchMode()
     m.searchQuery = ""
     m.filteredChannels = []
     
-    ' Show category list again
+    ' Show category list container again if categories exist
     if m.categoryLabelList <> invalid and m.categoryLabelList.content <> invalid and m.categoryLabelList.content.getChildCount() > 0
+        if m.categoryListContainer <> invalid
+            m.categoryListContainer.visible = true
+        end if
         m.categoryLabelList.visible = true
         print "M3UChannelScreen.brs - [exitSearchMode] Category list restored"
+        
+        ' Restore grid position with categories
+        if m.channelGridContainer <> invalid
+            m.channelGridContainer.translation = [280, 200]
+        end if
     end if
     
-    ' Show search prompt, hide search status
-    if m.searchPromptLabel <> invalid
-        m.searchPromptLabel.visible = true
+    ' Show options hint group, hide search status bar
+    if m.optionsHintGroup <> invalid
+        m.optionsHintGroup.visible = true
     end if
-    if m.searchStatusGroup <> invalid
-        m.searchStatusGroup.visible = false
+    if m.searchStatusBar <> invalid
+        m.searchStatusBar.visible = false
     end if
     
     ' Switch back to main grid
@@ -1135,14 +1202,20 @@ sub buildSearchResults()
     m.searchResultsGrid.content = contentNode
     m.channelGrid.visible = false
     m.searchResultsGrid.visible = true
-    m.searchResultsGrid.setFocus(true)
     m.activeGrid = m.searchResultsGrid
+    
+    ' Jump to first item and set focus
+    if contentNode.getChildCount() > 0
+        m.searchResultsGrid.jumpToItem = 0
+    end if
+    m.searchResultsGrid.setFocus(true)
     
     ' Update displays
     updateChannelCounter()
     updateSelectedIndex()
     
     print "M3UChannelScreen.brs - [buildSearchResults] Built search grid with " + channelCount.ToStr() + " items (out of " + totalMatches.ToStr() + " total matches)"
+    print "M3UChannelScreen.brs - [buildSearchResults] Focus set on search results grid"
 end sub
 
 sub onSearchResultSelected()
@@ -1167,8 +1240,8 @@ sub onSearchResultFocused()
     ' Update selected index display
     updateSelectedIndex()
     
-    ' Update preview player for search results too
-    updatePreviewPlayer(focusedIndex)
+    ' Preview player disabled for now
+    ' updatePreviewPlayer(focusedIndex)
 end sub
 
 sub onChannelFocused()
@@ -1179,8 +1252,8 @@ sub onChannelFocused()
     ' Update selected index display
     updateSelectedIndex()
     
-    ' Handle preview player based on focused position
-    updatePreviewPlayer(focusedIndex)
+    ' Preview player disabled for now
+    ' updatePreviewPlayer(focusedIndex)
     
     ' Auto-load more channels when user gets close to the end
     ' Load more when focusing on one of the last 10 items
@@ -1319,11 +1392,13 @@ sub updatePreviewPlayer(focusedIndex as Integer)
     m.lastFocusedRow = row
     
     ' Calculate position based on visual row
-    ' Grid: itemSize=[360, 250], itemSpacing=[20, 20]
-    itemWidth = 360
-    itemHeight = 250
-    spacingX = 20
-    spacingY = 20
+    ' Grid: itemSize=[370, 268], itemSpacing=[18, 18]
+    ' Preview only covers the poster area (210px), not the title section (58px)
+    itemWidth = 370
+    itemHeight = 268
+    posterHeight = 210
+    spacingX = 18
+    spacingY = 18
     
     posX = column * (itemWidth + spacingX)
     posY = visualRow * (itemHeight + spacingY)
@@ -1339,8 +1414,17 @@ sub updatePreviewPlayer(focusedIndex as Integer)
         print "  >>> PLEASE REPORT: Is preview overlaying the focused item correctly? (yes/no)"
     end if
     
+    ' Update preview channel name
+    channelTitle = "Unknown Channel"
+    if focusedItem.title <> invalid and focusedItem.title <> ""
+        channelTitle = focusedItem.title
+    end if
+    if m.previewChannelName <> invalid
+        m.previewChannelName.text = channelTitle
+    end if
+    
     if streamUrl <> "" and streamUrl <> m.currentPreviewUrl
-        print "M3UChannelScreen.brs - [updatePreviewPlayer] Loading preview for: " + focusedItem.title
+        print "M3UChannelScreen.brs - [updatePreviewPlayer] Loading preview for: " + channelTitle
         print "M3UChannelScreen.brs - [updatePreviewPlayer] Stream URL: " + streamUrl
         
         ' Clear error flag for new stream
@@ -1812,12 +1896,12 @@ sub resetScreen()
         m.selectedIndexLabel.text = ""
     end if
     
-    if m.searchPromptLabel <> invalid
-        m.searchPromptLabel.visible = true
+    if m.optionsHintGroup <> invalid
+        m.optionsHintGroup.visible = true
     end if
     
-    if m.searchStatusGroup <> invalid
-        m.searchStatusGroup.visible = false
+    if m.searchStatusBar <> invalid
+        m.searchStatusBar.visible = false
     end if
     
     ' Reset M3U URL

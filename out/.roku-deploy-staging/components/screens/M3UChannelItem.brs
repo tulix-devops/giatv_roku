@@ -1,74 +1,64 @@
 sub init()
     m.background = m.top.findNode("background")
+    m.focusBorder = m.top.findNode("focusBorder")
+    m.innerBackground = m.top.findNode("innerBackground")
     m.channelPoster = m.top.findNode("channelPoster")
+    m.titleBg = m.top.findNode("titleBg")
     m.bottomTitle = m.top.findNode("bottomTitle")
-    m.focusIndicator = m.top.findNode("focusIndicator")
+    m.categoryLabel = m.top.findNode("categoryLabel")
 end sub
 
 sub onContentChanged()
     content = m.top.itemContent
-    
-    print "M3UChannelItem - onContentChanged called"
-    
-    if content = invalid
-        print "M3UChannelItem - content is invalid"
-        return
-    end if
-    
-    ' Get channel name/title
+    if content = invalid then return
+
+    ' Title
     channelTitle = "Unknown Channel"
     if content.title <> invalid and content.title <> ""
         channelTitle = content.title
-        print "M3UChannelItem - Title: " + channelTitle
-    else if content.name <> invalid and content.name <> ""
-        channelTitle = content.name
-        print "M3UChannelItem - Name: " + channelTitle
     end if
-    
-    ' Set title below card (only place we show title)
-    if m.bottomTitle <> invalid
-        m.bottomTitle.text = channelTitle
+    if m.bottomTitle <> invalid then m.bottomTitle.text = channelTitle
+
+    ' Category subtitle
+    if m.categoryLabel <> invalid
+        if content.category <> invalid and content.category <> ""
+            m.categoryLabel.text = content.category
+        else
+            m.categoryLabel.text = ""
+        end if
     end if
-    
-    ' Set poster/logo (try multiple fields)
+
+    ' Poster
     posterUrl = ""
-    if content.HDPosterUrl <> invalid and content.HDPosterUrl <> ""
-        posterUrl = content.HDPosterUrl
-    else if content.hdPosterUrl <> invalid and content.hdPosterUrl <> ""
-        posterUrl = content.hdPosterUrl
-    else if content.FHDPosterUrl <> invalid and content.FHDPosterUrl <> ""
-        posterUrl = content.FHDPosterUrl
-    else if content.posterUrl <> invalid and content.posterUrl <> ""
-        posterUrl = content.posterUrl
-    else if content.thumbnail <> invalid and content.thumbnail <> ""
-        posterUrl = content.thumbnail
-    else if content.logo <> invalid and content.logo <> ""
-        posterUrl = content.logo
-    end if
-    
-    if posterUrl <> ""
-        m.channelPoster.uri = posterUrl
-        print "M3UChannelItem - Poster set: " + posterUrl
-    else
-        ' Set to app logo explicitly when no channel logo exists
-        m.channelPoster.uri = "pkg:/images/png/gia-tv-logo.png"
-        print "M3UChannelItem - No poster found, using app logo placeholder"
+    if content.HDPosterUrl <> invalid and content.HDPosterUrl <> "" then posterUrl = content.HDPosterUrl
+    if posterUrl = "" and content.hdPosterUrl <> invalid and content.hdPosterUrl <> "" then posterUrl = content.hdPosterUrl
+    if posterUrl = "" and content.logo <> invalid and content.logo <> "" then posterUrl = content.logo
+
+    if m.channelPoster <> invalid
+        if posterUrl <> ""
+            m.channelPoster.uri = posterUrl
+        else
+            m.channelPoster.uri = "pkg:/images/png/poster_not_found_350x245.png"
+        end if
     end if
 end sub
 
 sub onFocusPercentChanged()
     focusPercent = m.top.focusPercent
-    
-    ' Animate focus indicator
-    if focusPercent > 0.5
-        m.focusIndicator.opacity = 0.3
-        if m.bottomTitle <> invalid
-            m.bottomTitle.color = "0xFFFFFFFF"
-        end if
-    else
-        m.focusIndicator.opacity = 0.0
-        if m.bottomTitle <> invalid
-            m.bottomTitle.color = "0xCCCCCCFF"
-        end if
-    end if
+
+    ' if focusPercent > 0.5
+    '     ' Focused state - simple white border
+    '     if m.focusBorder <> invalid then m.focusBorder.opacity = 1.0
+    '     if m.titleBg <> invalid then m.titleBg.color = "#1e2640"
+    '     if m.innerBackground <> invalid then m.innerBackground.color = "#1e2640"
+    '     if m.bottomTitle <> invalid then m.bottomTitle.color = "#ffffff"
+    '     if m.categoryLabel <> invalid then m.categoryLabel.color = "#cccccc"
+    ' else
+    '     ' Unfocused state
+    '     if m.focusBorder <> invalid then m.focusBorder.opacity = 0.0
+    '     if m.titleBg <> invalid then m.titleBg.color = "#0f1623"
+    '     if m.innerBackground <> invalid then m.innerBackground.color = "#131720"
+    '     if m.bottomTitle <> invalid then m.bottomTitle.color = "#cccccc"
+    '     if m.categoryLabel <> invalid then m.categoryLabel.color = "#9ca3af"
+    ' end if
 end sub

@@ -8,308 +8,381 @@
     <script type="text/brightscript" uri="pkg:/components/screens/M3UChannelScreen.brs"/>
 
     <children>
-        <!-- Background -->
+        <!-- ============================================ -->
+        <!-- BACKGROUND -->
+        <!-- ============================================ -->
         <Rectangle
             id="backgroundRect"
             width="1920"
             height="1080"
-            color="#0f1419"
+            color="#0a0e14"
             translation="[0, 0]"/>
 
-        <!-- Screen Header with Tab Name and Branding -->
-        <Group id="screenHeaderGroup" translation="[25, 15]" visible="true">
-            <!-- Left side: Tab Name • Timestamp -->
-            <Group id="headerLeftGroup" translation="[0, 0]">
-                <!-- Tab Name -->
-                <Label
-                    id="screenTabName"
-                    text="M3U Channels"
-                    color="#ffffff"
-                    font="font:UrbanistBold"
-                    horizAlign="left"
-                    vertAlign="center"
-                    translation="[0, 42]"
-                    height="36">
-                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32"/>
-                </Label>
-                
-                <!-- Dot Separator -->
-                <Label
-                    id="screenDotSeparator"
-                    text="•"
-                    color="#6366f1"
-                    font="font:UrbanistBold"
-                    horizAlign="center"
-                    vertAlign="center"
-                    translation="[260, 42]"
-                    width="20"
-                    height="36">
-                    <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="32"/>
-                </Label>
-                
-                <!-- Local Time Display -->
-                <Label
-                    id="screenTimeLabel"
-                    text="00:00"
-                    color="#ffffff"
-                    font="font:UrbanistMedium"
-                    horizAlign="left"
-                    vertAlign="center"
-                    translation="[280, 44]"
-                    height="32">
-                    <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
-                </Label>
-            </Group>
-            
-            <!-- Right side: GiaTV Logo -->
-            <Poster
-                id="screenBrandIcon"
-                uri="pkg:/images/img/gia-tv-small.png"
-                width="120"
-                height="120"
-                translation="[1710, 0]"
-                loadDisplayMode="scaleToFit"/>
-            
-            <!-- Header Divider Line -->
-            <Rectangle
-                id="headerDivider"
-                width="1850"
-                height="2"
-                color="0x3A4A6AFF"
-                translation="[0, 125]"/>
-        </Group>
+        <!-- ============================================ -->
+        <!-- SECTION 1: HEADER BAR (130px) -->
+        <!-- ============================================ -->
+        <Rectangle
+            id="headerBarBg"
+            translation="[0, 0]"
+            width="1920"
+            height="130"
+            color="#0f1419"/>
 
-        <!-- Loading indicator -->
-        <Group id="loadingGroup" translation="[890, 540]" visible="true">
+        <!-- Zone 1: Screen Title (Left) -->
+        <Label
+            id="screenTabName"
+            text="M3U Channels"
+            translation="[40, 50]"
+            color="#ffffff"
+            width="300"
+            height="44"
+            vertAlign="center">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="36"/>
+        </Label>
+
+        <!-- Zone 2: Loading Status Card (Left-Center) -->
+        <Rectangle
+            id="loadingStatusCardBg"
+            translation="[360, 18]"
+            width="280"
+            height="94"
+            color="#1a1f2e"/>
+
+        <Label
+            id="loadingStatusTitle"
+            text="Loading Status"
+            translation="[360, 28]"
+            color="#ffffff"
+            width="280"
+            horizAlign="center"
+            height="32">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24"/>
+        </Label>
+
+        <Label
+            id="channelCountLabel"
+            text="Loading..."
+            translation="[360, 64]"
+            color="#9ca3af"
+            width="280"
+            horizAlign="center"
+            height="26">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
+        </Label>
+
+        <!-- Zone 3: Stats Card (Center) -->
+        <Rectangle
+            id="statsCardBg"
+            translation="[660, 18]"
+            width="280"
+            height="94"
+            color="#1a1f2e"/>
+
+        <Label
+            id="statsChannelCount"
+            text="0 Channels"
+            translation="[660, 28]"
+            color="#ffffff"
+            width="280"
+            horizAlign="center"
+            height="32">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="24"/>
+        </Label>
+
+        <Label
+            id="selectedIndexLabel"
+            text="Select a channel"
+            translation="[660, 64]"
+            color="#9ca3af"
+            width="280"
+            horizAlign="center"
+            height="26">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
+        </Label>
+
+        <!-- Zone 4: Clock Card -->
+        <Rectangle
+            id="clockCardBg"
+            translation="[960, 18]"
+            width="160"
+            height="94"
+            color="#1a1f2e"/>
+
+        <Label
+            id="screenTimeLabel"
+            text="00:00"
+            translation="[960, 28]"
+            color="#ffffff"
+            width="160"
+            horizAlign="center"
+            height="36">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28"/>
+        </Label>
+
+        <Label
+            id="localTimeHint"
+            text="Local Time"
+            translation="[960, 68]"
+            color="#9ca3af"
+            width="160"
+            horizAlign="center"
+            height="22">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="16"/>
+        </Label>
+
+        <!-- Zone 5: Source URL Card -->
+        <Rectangle
+            id="sourceUrlCardBg"
+            translation="[1140, 18]"
+            width="540"
+            height="94"
+            color="#1a1f2e"/>
+
+        <Label
+            id="sourceUrlTitle"
+            text="Source URL"
+            translation="[1140, 28]"
+            color="#ffffff"
+            width="540"
+            horizAlign="center"
+            height="28">
+            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20"/>
+        </Label>
+
+        <Label
+            id="sourceUrlLabel"
+            text="..."
+            translation="[1150, 60]"
+            color="#9ca3af"
+            width="520"
+            horizAlign="center"
+            height="44"
+            maxLines="2"
+            ellipsisText="...">
+            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="16"/>
+        </Label>
+
+        <!-- Zone 6: GiaTV Logo (Far Right) -->
+        <Poster
+            id="screenBrandIcon"
+            uri="pkg:/images/img/gia-tv-small.png"
+            translation="[1700, 15]"
+            width="100"
+            height="100"
+            loadDisplayMode="scaleToFit"/>
+
+        <!-- Header Divider -->
+        <Rectangle
+            id="headerDivider"
+            translation="[0, 130]"
+            width="1920"
+            height="2"
+            color="#1e2a3a"/>
+
+        <!-- ============================================ -->
+        <!-- SECTION 2: SEARCH / OPTIONS HINT BAR -->
+        <!-- ============================================ -->
+        <Group id="optionsHintGroup" translation="[40, 142]">
+            <Rectangle
+                id="optionsAccentBar"
+                translation="[0, 2]"
+                width="4"
+                height="28"
+                color="#00bcd4"/>
             <Label
-                id="loadingLabel"
-                text="Loading channels..."
-                color="#ffffff"
-                font="font:UrbanistMedium"
-                horizAlign="center"
-                translation="[-100, 0]"
-                width="300">
-                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
+                id="searchPromptLabel"
+                text="Press OPTIONS to Search"
+                translation="[14, 0]"
+                color="#9ca3af"
+                width="500"
+                height="32"
+                visible="true">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
             </Label>
         </Group>
 
-        <!-- Search Prompt (Left side) -->
-        <Label
-            id="searchPromptLabel"
-            text="Press OPTIONS for Search"
-            color="#6366f1"
-            font="font:UrbanistMedium"
-            horizAlign="left"
-            vertAlign="center"
-            translation="[25, 170]"
-            width="300"
-            height="30"
-            visible="false">
-            <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
-        </Label>
-
-        <!-- Search Status Display -->
-        <Group id="searchStatusGroup" translation="[20, 155]" visible="false">
+        <!-- Search Status Group (shown during search mode) -->
+        <Group id="searchStatusBar" translation="[40, 138]" visible="false">
+            <Rectangle width="4" height="32" color="#00bcd4" translation="[0, 2]"/>
             <Label
                 id="searchStatusLabel"
-                text="Search: "
+                text="Search:"
+                translation="[14, 0]"
                 color="#ffffff"
-                font="font:UrbanistBold"
-                horizAlign="left"
-                vertAlign="center"
-                translation="[5, 0]"
-                width="115"
-                height="30">
+                width="110"
+                height="36">
                 <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="26"/>
             </Label>
             <Label
                 id="searchQueryText"
                 text=""
-                color="#4FC3F7"
-                font="font:UrbanistMedium"
-                horizAlign="left"
-                vertAlign="center"
-                translation="[100, 0]"
-                width="400"
-                height="30">
-                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28"/>
+                translation="[130, 0]"
+                color="#00bcd4"
+                width="600"
+                height="36">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="26"/>
             </Label>
             <Label
                 id="searchClearHint"
-                text="(OPTIONS to search again, BACK to clear)"
-                color="#888888"
-                font="font:UrbanistMedium"
-                horizAlign="left"
-                vertAlign="center"
-                translation="[5, 35]"
-                width="600"
-                height="25">
-                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="24"/>
+                text="OPTIONS: new search  •  BACK: clear"
+                translation="[14, 38]"
+                color="#4b5563"
+                width="700"
+                height="26">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
             </Label>
         </Group>
 
-        <!-- Channel Count Display (Right side) -->
-        <Label
-            id="channelCountLabel"
-            text="0 channels loaded"
-            color="#ffffff"
-            font="font:UrbanistBold"
-            horizAlign="right"
-            vertAlign="center"
-            translation="[1475, 150]"
-            width="400"
-            height="40"
-            visible="false">
-            <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="28"/>
-        </Label>
+        <!-- ============================================ -->
+        <!-- SECTION 3a: CATEGORY SIDEBAR -->
+        <!-- ============================================ -->
+        <Group id="categoryListContainer" translation="[40, 200]" visible="true">
+            <Rectangle
+                id="sidebarBg"
+                width="295"
+                height="830"
+                color="#111827"/>
 
-        <!-- Selected Item Index Display -->
+            <Rectangle
+                id="sidebarAccentBar"
+                translation="[0, 8]"
+                width="4"
+                height="24"
+                color="#00bcd4"/>
+
+            <Label
+                id="sidebarHeaderLabel"
+                text="Categories"
+                translation="[14, 6]"
+                color="#ffffff"
+                width="200"
+                height="30">
+                <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="27"/>
+            </Label>
+
+            <LabelList
+                id="categoryLabelList"
+                translation="[20, 42]"
+                itemSize="[250, 45]"
+                numRows="13"
+                focusRow="0"
+                drawFocusFeedback="true"
+                color="#ffffff"
+                focusedColor="#131720"
+                vertFocusAnimationStyle="fixedFocus"
+                itemSpacing="[0, 14]"
+                wrap="false"
+                visible="true"/>
+
+            <Label
+                id="sidebarNavHint"
+                text="↑↓ Browse  •  → Channels"
+                translation="[10, 800]"
+                color="#4b5563"
+                width="200"
+                height="26">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="18"/>
+            </Label>
+        </Group>
+
+        <!-- ============================================ -->
+        <!-- SECTION 3b: CHANNEL GRID CONTAINER -->
+        <!-- ============================================ -->
+        <Group id="channelGridContainer" translation="[360, 200]">
+
+            <!-- Main Channel Grid -->
+            <MarkupGrid
+                id="channelGrid"
+                translation="[0, 0]"
+                visible="false"
+                itemComponentName="M3UChannelItem"
+                vertFocusAnimationStyle="floatingFocus"
+                itemSize="[370, 268]"
+                numColumns="4"
+                numRows="3"
+                itemSpacing="[18, 18]"
+                drawFocusFeedback="true"
+                drawFocusFeedbackOnTop="false"
+                />
+
+            <!-- Search Results Grid -->
+            <MarkupGrid
+                id="searchResultsGrid"
+                translation="[0, 0]"
+                visible="false"
+                itemComponentName="M3UChannelItem"
+                vertFocusAnimationStyle="floatingFocus"
+                itemSize="[370, 268]"
+                numColumns="4"
+                numRows="3"
+                itemSpacing="[18, 18]"
+                drawFocusFeedback="false"/>
+
+            <!-- ============================================ -->
+            <!-- PREVIEW PLAYER OVERLAY (DISABLED) -->
+            <!-- ============================================ -->
+            <!-- Preview player commented out for now
+            <Group id="previewPlayerContainer" translation="[0, 0]" visible="false">
+                ...
+            </Group>
+            -->
+        </Group>
+
+        <!-- ============================================ -->
+        <!-- SECTION 4: LOADING STATE CARD -->
+        <!-- ============================================ -->
+        <Group id="loadingGroup" translation="[660, 430]" visible="true">
+            <Rectangle
+                id="loadingCardBg"
+                width="600"
+                height="120"
+                color="#1a1f2e"/>
+            <Label
+                id="loadingLabel"
+                text="Loading M3U playlist..."
+                translation="[0, 40]"
+                color="#ffffff"
+                width="600"
+                height="40"
+                horizAlign="center">
+                <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="26"/>
+            </Label>
+        </Group>
+
+        <!-- ============================================ -->
+        <!-- SECTION 5: BOTTOM NAVIGATION BAR -->
+        <!-- ============================================ -->
+        <Rectangle
+            id="bottomBarDivider"
+            translation="[0, 1038]"
+            width="1920"
+            height="2"
+            color="#1e2a3a"/>
+
         <Label
-            id="selectedIndexLabel"
-            text="Item 1 selected"
-            color="#cccccc"
-            font="font:UrbanistMedium"
-            horizAlign="right"
-            vertAlign="center"
-            translation="[1475, 190]"
-            width="400"
+            id="bottomNavHints"
+            text="OK: Play Full Screen  •  ← Categories  •  OPTIONS: Search"
+            translation="[0, 1046]"
+            color="#4b5563"
+            width="1920"
             height="30"
-            visible="false">
+            horizAlign="center">
             <Font role="font" uri="pkg:/images/UrbanistMedium.ttf" size="20"/>
         </Label>
 
-        <!-- Animations -->
-        <Animation id="gridFadeOut" duration="0.15" repeat="false" easeFunction="linear">
+        <!-- ============================================ -->
+        <!-- SECTION 6: ANIMATIONS -->
+        <!-- ============================================ -->
+        <Animation id="gridFadeOut" duration="0.15" repeat="false" easeFunction="outCubic">
             <FloatFieldInterpolator key="[1.0, 0.0]" fieldToInterp="channelGridContainer.opacity"/>
         </Animation>
-        <Animation id="gridFadeIn" duration="0.2" repeat="false" easeFunction="linear">
+        <Animation id="gridFadeIn" duration="0.2" repeat="false" easeFunction="outCubic">
             <FloatFieldInterpolator key="[0.0, 1.0]" fieldToInterp="channelGridContainer.opacity"/>
         </Animation>
-        
-        <!-- Main Content Container (Left sidebar + Right grid) -->
-        <Group id="contentContainer" translation="[25, 240]">
-            
-            <!-- Left Side: Category List -->
-            <Group id="categoryListContainer" translation="[0, 10]">
-                <LabelList
-                    id="categoryLabelList"
-                    translation="[0, 0]"
-                    itemSize="[280, 35]"
-                    numRows="20"
-                    focusRow="0"
-                    drawFocusFeedback="true"
-                    focusBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
-                    focusFootprintBitmapUri="pkg:/images/png/shapes/button_unfocused.9.png"
-                    color="0xFFFFFFFF"
-                    focusedColor="0x3A4A6AFF"
-                    font="font:SmallSystemFont"
-                    focusedFont="font:SmallSystemFont"
-                    vertFocusAnimationStyle="fixedFocus"
-                    itemSpacing="[0, 35]"
-                    sectionDividerLeftOffset="20"
-                    visible="false"
-                    wrap="false"/>
-            </Group>
-            
-            <!-- Right Side: Channel Grid (4 columns) -->
-            <Group id="channelGridContainer" translation="[330, 0]">
-                <!-- Grid View for Channels -->
-                <MarkupGrid
-                    id="channelGrid"
-                    translation="[0, 0]"
-                    visible="false"
-                    itemComponentName="M3UChannelItem"
-                    vertFocusAnimationStyle="floatingFocus"
-                    itemSize="[360, 250]"
-                    numColumns="4"
-                    numRows="3"
-                    itemSpacing="[20, 20]"
-                    drawFocusFeedback="true"/>
 
-                <!-- Search Results Grid (same position, shows filtered results) -->
-                <MarkupGrid
-                    id="searchResultsGrid"
-                    translation="[0, 0]"
-                    visible="false"
-                    itemComponentName="M3UChannelItem"
-                    itemSize="[360, 250]"
-                    numColumns="4"
-                    numRows="3"
-                    vertFocusAnimationStyle="floatingFocus"
-                    itemSpacing="[20, 20]"
-                    drawFocusFeedback="true"/>
-                
-                <!-- Preview Player Overlay (positioned over focused item) -->
-                <Group id="previewPlayerContainer" translation="[0, 0]" visible="false">
-                    <!-- Background for preview -->
-                    <Rectangle
-                        id="previewBackground"
-                        width="360"
-                        height="250"
-                        color="#000000"
-                        opacity="1.0"/>
-                    
-                    <!-- Preview Video Player (same size as grid item) -->
-                    <Video
-                        id="previewPlayer"
-                        translation="[0, 0]"
-                        width="360"
-                        height="250"
-                        visible="true"
-                        loop="false"
-                        enableUI="false"/>
-                    
-                    <!-- Status Messages Container (centered, full width) -->
-                    <Group id="previewStatusGroup" translation="[0, 0]" visible="false">
-                        <!-- Background for status -->
-                        <Rectangle
-                            width="360"
-                            height="250"
-                            color="#000000"
-                            opacity="0.85"
-                            translation="[0, 0]"/>
-                        
-                        <!-- Status Message (Loading / Error) -->
-                        <Label
-                            id="previewStatusLabel"
-                            text="Loading Stream..."
-                            color="#ffffff"
-                            font="font:MediumBoldSystemFont"
-                            horizAlign="center"
-                            vertAlign="center"
-                            translation="[0, 100]"
-                            width="340"
-                            height="50"
-                            wrap="true"/>
-                    </Group>
-                    
-                    <!-- LIVE indicator badge (bigger and more visible) -->
-                    <Rectangle
-                        id="liveIndicatorBg"
-                        translation="[8, 8]"
-                        width="80"
-                        height="35"
-                        color="#FF0000"
-                        opacity="1.0"/>
-                    <Label
-                        id="liveIndicatorText"
-                        text="● LIVE"
-                        color="#ffffff"
-                        font="font:MediumBoldSystemFont"
-                        horizAlign="center"
-                        vertAlign="center"
-                        translation="[8, 8]"
-                        width="80"
-                        height="35">
-                        <Font role="font" uri="pkg:/images/UrbanistBold.ttf" size="20"/>
-                    </Label>
-                </Group>
-            </Group>
-        </Group>
-        
-        
-
-        <!-- Clock Timer -->
+        <!-- ============================================ -->
+        <!-- SECTION 7: CLOCK TIMER -->
+        <!-- ============================================ -->
         <Timer
             id="clockTimer"
             repeat="true"
